@@ -1,0 +1,3675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>DeliverPort — Share work. Get paid on-chain.</title>
+<meta name="description" content="The delivery portal for freelancers who bill in USDC on Base. Share deliverables, create invoices, and get paid on-chain." />
+
+<!-- ═══════════════════════════════════════════════════════════════
+     FONTS — editorial + utility pairing
+     ═══════════════════════════════════════════════════════════════ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Tailwind Play CDN (MVP — swap for build later) -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      fontFamily: {
+        sans: ['Inter','ui-sans-serif','system-ui','sans-serif'],
+        display: ['"Instrument Serif"','ui-serif','Georgia','serif'],
+        mono: ['"JetBrains Mono"','ui-monospace','monospace'],
+      },
+    }}
+  }
+</script>
+
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     DESIGN TOKENS + GLOBAL STYLES
+     DeliverPort: warm earth tones + blue-indigo brand
+     ═══════════════════════════════════════════════════════════════ */
+  :root {
+    --bg:         #f6f4ef;
+    --bg-elev:    #fbfaf6;
+    --bg-sunken:  #efebe0;
+    --border:     #e3ddcb;
+    --border-strong: #cdc3a8;
+    --ink:        #1a170f;
+    --ink-muted:  #5e533a;
+    --ink-faint:  #8f8158;
+    --brand:      #4338ca;
+    --brand-ink:  #f6f4ef;
+    --accent:     #c97627;
+    --danger:     #a33222;
+  }
+  .dark {
+    --bg:         #0e0c07;
+    --bg-elev:    #15120a;
+    --bg-sunken:  #0a0804;
+    --border:     #2a2519;
+    --border-strong: #3e3727;
+    --ink:        #f6f4ef;
+    --ink-muted:  #b9ac86;
+    --ink-faint:  #8f8158;
+    --brand:      #818cf8;
+    --brand-ink:  #0a0d20;
+  }
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss01","cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background-image:
+      radial-gradient(1200px 600px at 100% -10%, rgba(99,102,241,0.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(67,56,202,0.05), transparent 60%);
+  }
+  .font-display { font-family: "Instrument Serif", ui-serif, Georgia, serif; letter-spacing: -0.01em; }
+  .font-mono    { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  /* Glass card — warm, subtle */
+  .card {
+    background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 1px 0 rgba(14,12,7,0.04), 0 1px 2px rgba(14,12,7,0.05), 0 12px 36px -18px rgba(14,12,7,0.12);
+    backdrop-filter: blur(8px) saturate(1.05);
+  }
+  .card-flat {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .hairline { border-color: var(--border); }
+  .divide-hair > * + * { border-top: 1px solid var(--border); }
+
+  /* Buttons */
+  .btn {
+    display:inline-flex; align-items:center; gap:.5rem;
+    padding:.55rem .9rem; border-radius:10px;
+    font-weight:500; font-size:.875rem; line-height:1;
+    border:1px solid var(--border-strong);
+    background: var(--bg-elev); color: var(--ink);
+    transition: transform .08s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+    cursor: pointer;
+  }
+  .btn:hover { background: color-mix(in srgb, var(--bg-elev) 80%, var(--ink) 4%); }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: var(--brand); color: var(--brand-ink); border-color: transparent;
+    box-shadow: 0 1px 0 rgba(0,0,0,.15), 0 6px 18px -6px color-mix(in srgb, var(--brand) 55%, transparent);
+  }
+  .btn-primary:hover { background: color-mix(in srgb, var(--brand) 90%, #000); }
+  .btn-ghost { background: transparent; border-color: transparent; }
+  .btn-ghost:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .btn-danger { background: var(--danger); color: #fff7f3; border-color: transparent; }
+  .btn-danger:hover { background: color-mix(in srgb, var(--danger) 90%, #000); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+
+  /* Inputs */
+  .field {
+    width: 100%;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: .65rem .8rem;
+    font-size: .9rem;
+    color: var(--ink);
+    transition: border-color .15s ease, box-shadow .15s ease;
+    font-family: inherit;
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
+  }
+  textarea.field { min-height: 96px; resize: vertical; line-height: 1.55; }
+  label.lbl { display:block; font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color: var(--ink-muted); margin-bottom:.35rem; }
+
+  /* Chips */
+  .chip {
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.2rem .55rem; border-radius:999px;
+    font-size:.72rem; font-weight:600; letter-spacing:.02em;
+    border:1px solid var(--border-strong);
+    background: var(--bg-elev); color: var(--ink-muted);
+  }
+  .chip-dot { width:6px; height:6px; border-radius:999px; background: currentColor; }
+  .chip-moss   { color:#1f5d23; background:#eef7ee; border-color:#a9d5a7; }
+  .chip-amber  { color:#8a4b03; background:#fff4e6; border-color:#ffc166; }
+  .chip-clay   { color:#7e420d; background:#fbf1e7; border-color:#e8b985; }
+  .chip-danger { color:#7c241a; background:#fbeae6; border-color:#e9a79c; }
+  .chip-ink    { color:#1a170f; background:#ece8dc; border-color:#b9ac86; }
+  .chip-indigo { color:#3730a3; background:#eef2ff; border-color:#a5b4fc; }
+
+  /* Editorial type */
+  .eyebrow { font-family:"Instrument Serif", serif; font-style: italic; color: var(--ink-faint); font-size: 1rem; }
+  .h1 { font-family:"Instrument Serif", serif; font-size: clamp(2rem, 4.2vw, 3.2rem); line-height: 1.05; letter-spacing: -0.015em; font-weight: 400; }
+  .h2 { font-family:"Instrument Serif", serif; font-size: clamp(1.5rem, 2.8vw, 2rem); line-height: 1.1; font-weight: 400; }
+  .kbd { font-family:"JetBrains Mono", monospace; font-size:.7rem; padding:.1rem .4rem; border-radius:5px; background:var(--bg-sunken); border:1px solid var(--border); color:var(--ink-muted); }
+
+  /* Nav */
+  .navlink { display:flex; align-items:center; gap:.6rem; padding:.55rem .75rem; border-radius:10px; color:var(--ink-muted); font-size:.88rem; font-weight:500; text-decoration:none; }
+  .navlink:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); }
+  .navlink.active { background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 25%, transparent); }
+  .navlink .ico { width:16px; height:16px; stroke-width:2; flex-shrink:0; }
+  .navlink .ico { width:16px; height:16px; stroke-width:2; flex-shrink:0; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: var(--bg);
+    padding:.75rem 1.2rem; border-radius:12px; font-size:.85rem; font-weight:500;
+    box-shadow: 0 12px 40px -12px rgba(0,0,0,.4);
+    opacity:0; pointer-events:none; transition: all .25s ease; z-index:100;
+  }
+  .toast.show { opacity:1; transform: translateX(-50%) translateY(0); }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset:0; background: color-mix(in srgb, var(--ink) 40%, transparent); backdrop-filter: blur(6px); z-index:50; display:flex; align-items:center; justify-content:center; padding:1rem; }
+  .modal { width:100%; max-width:640px; max-height:88vh; overflow-y:auto; }
+
+  /* Responsive sidebar */
+  .sidebar { transition: transform .25s ease; }
+  @media (max-width: 900px) {
+    .sidebar { position: fixed; top:0; bottom:0; left:0; width:260px; transform: translateX(-100%); z-index:40; }
+    .sidebar.open { transform: translateX(0); }
+    .main-area { margin-left: 0 !important; }
+  }
+
+  /* Animations */
+  @keyframes fadeUp { from { opacity:0; transform: translateY(8px);} to { opacity:1; transform:none;} }
+  .anim-in { animation: fadeUp .3s ease both; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin 1s linear infinite; }
+
+  /* Charts */
+  .bar { transition: width .4s cubic-bezier(.2,.8,.2,1); }
+
+  /* Line clamp */
+  .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+</style>
+</head>
+<body class="min-h-screen antialiased">
+
+<div id="boot" class="fixed inset-0 flex items-center justify-center z-[100]" style="background:var(--bg)">
+  <div class="text-center px-6">
+    <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl mb-5" style="background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;box-shadow:0 12px 36px -20px rgba(99,102,241,.65)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="w-6 h-6"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>
+    </div>
+    <div class="font-display text-3xl">DeliverPort</div>
+    <div class="mt-3 text-sm" style="color:var(--ink-muted)">Preparing your workspace…</div>
+    <div class="mt-1 text-xs" style="color:var(--ink-faint)">Share work, review progress, and get paid with confidence.</div>
+  </div>
+</div>
+
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="toast" class="toast"></div>
+
+<script type="module">
+/* ════════════════════════════════════════════════════════════════════════════
+   DELIVERPORT — single-file app
+   Client delivery portal + on-chain billing for freelancers.
+   Organised into labelled sections:
+     1.  CONFIG            — tunables, pricing, currencies
+     2.  ICONS             — inline SVG library
+     3.  UTILS             — helpers (format, csv, download, esc…)
+     4.  AUTH CRYPTO        — password hashing
+     5.  SCHEMA            — SQL DDL (tables, indexes)
+     6.  SEED              — initial demo data
+     7.  DB                — PGlite instance + query facade
+     8.  FX                — live currency conversion
+     9.  STORE             — reactive in-memory projection
+     10. SERVICES          — business logic (Users, Auth, Clients, Projects, Revenue)
+     11. COMPONENTS        — shared UI pieces (Toast, Modal, UI helpers)
+     12. PAGES             — landing, login, dashboard, billing, portal, share
+     13. ROUTER            — hash router + shell layout
+     14. BOOT              — bring up PGlite, hydrate store, first render
+   ════════════════════════════════════════════════════════════════════════════ */
+
+import { PGlite } from 'https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js';
+
+/* ══════════════════════════════════════ 0. CRYPTO — Base USDC payment layer ══════════════════════════════════════
+   Lazy-loads viem from esm.sh CDN. Only downloaded when a user interacts with wallet features.
+   Chain: Base (8453) · Tokens: USDC (6 dec), USDT (6 dec)
+   ═══════════════════════════════════════════════════════════════════════════════════════════════════════ */
+const BASE_TOKENS = {
+  USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
+  USDT: { address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', decimals: 6, symbol: 'USDT', name: 'Tether USD' },
+};
+const BASE_CHAIN = {
+  id: 8453, name: 'Base',
+  rpcUrls: ['https://mainnet.base.org', 'https://base.llamarpc.com', 'https://base.drpc.org'],
+  blockExplorer: 'https://basescan.org',
+};
+const ERC20_ABI = [
+  { inputs:[{name:'account',type:'address'}], name:'balanceOf', outputs:[{name:'',type:'uint256'}], stateMutability:'view', type:'function' },
+  { inputs:[{name:'to',type:'address'},{name:'value',type:'uint256'}], name:'transfer', outputs:[{name:'',type:'bool'}], stateMutability:'nonpayable', type:'function' },
+  { anonymous:false, inputs:[{indexed:true,name:'from',type:'address'},{indexed:true,name:'to',type:'address'},{indexed:false,name:'value',type:'uint256'}], name:'Transfer', type:'event' },
+];
+
+const Crypto = {
+  _viem: null, _client: null, _wallet: null, _account: null, _loading: false, _listeners: new Set(),
+
+  async _loadViem() {
+    if (this._viem) return this._viem;
+    this._viem = await import('https://esm.sh/viem@2.47.12');
+    return this._viem;
+  },
+
+  async getPublicClient() {
+    if (this._client) return this._client;
+    const viem = await this._loadViem();
+    for (const rpc of BASE_CHAIN.rpcUrls) {
+      try {
+        this._client = viem.createPublicClient({
+          chain: { id: BASE_CHAIN.id, name: BASE_CHAIN.name, nativeCurrency: { name:'Ether', symbol:'ETH', decimals:18 }, rpcUrls: { default: { http: [rpc] } } },
+          transport: viem.http(rpc),
+        });
+        await this._client.getBlockNumber();
+        return this._client;
+      } catch { this._client = null; }
+    }
+    throw new Error('All Base RPC endpoints failed');
+  },
+
+  hasWallet() { return typeof window !== 'undefined' && !!window.ethereum; },
+
+  async connect() {
+    if (!this.hasWallet()) throw new Error('No wallet detected. Install MetaMask or Coinbase Wallet.');
+    this._loading = true; this._notify();
+    try {
+      const viem = await this._loadViem();
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      if (!accounts?.length) throw new Error('No accounts returned');
+      await this._switchToBase();
+      this._account = accounts[0];
+      this._wallet = viem.createWalletClient({
+        account: this._account,
+        chain: { id: BASE_CHAIN.id, name: BASE_CHAIN.name, nativeCurrency: { name:'Ether', symbol:'ETH', decimals:18 }, rpcUrls: { default: { http: [BASE_CHAIN.rpcUrls[0]] } } },
+        transport: viem.custom(window.ethereum),
+      });
+      window.ethereum.on('accountsChanged', (a) => { this._account = a[0] || null; if (!this._account) this.disconnect(); this._notify(); });
+      window.ethereum.on('chainChanged', () => window.location.reload());
+    } finally { this._loading = false; this._notify(); }
+    return this._account;
+  },
+
+  async _switchToBase() {
+    try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x' + BASE_CHAIN.id.toString(16) }] }); }
+    catch (e) {
+      if (e.code === 4902) await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x'+BASE_CHAIN.id.toString(16), chainName:'Base', nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18}, rpcUrls:[BASE_CHAIN.rpcUrls[0]], blockExplorerUrls:[BASE_CHAIN.blockExplorer] }] });
+      else throw e;
+    }
+  },
+
+  disconnect() { this._wallet = null; this._account = null; this._notify(); },
+  address() { return this._account || null; },
+  shortAddress(addr) { const a = addr || this._account; return a ? a.slice(0,6) + '…' + a.slice(-4) : ''; },
+  isConnected() { return !!this._account; },
+
+  async getBalance(address, token = 'USDC') {
+    const client = await this.getPublicClient();
+    const t = BASE_TOKENS[token]; if (!t) throw new Error(`Unknown token: ${token}`);
+    const raw = await client.readContract({ address: t.address, abi: ERC20_ABI, functionName: 'balanceOf', args: [address] });
+    return Number(raw) / (10 ** t.decimals);
+  },
+
+  async sendPayment(toAddress, amountUsd, token = 'USDC') {
+    if (!this._wallet) throw new Error('Wallet not connected');
+    const viem = await this._loadViem();
+    const t = BASE_TOKENS[token]; if (!t) throw new Error(`Unknown token: ${token}`);
+    const amountRaw = BigInt(Math.round(amountUsd * (10 ** t.decimals)));
+    const data = viem.encodeFunctionData({ abi: ERC20_ABI, functionName: 'transfer', args: [toAddress, amountRaw] });
+    return this._wallet.sendTransaction({
+      to: t.address, data,
+      chain: { id: BASE_CHAIN.id, name: BASE_CHAIN.name, nativeCurrency: { name:'Ether', symbol:'ETH', decimals:18 }, rpcUrls: { default: { http: [BASE_CHAIN.rpcUrls[0]] } } },
+    });
+  },
+
+  async waitForTx(hash) { const c = await this.getPublicClient(); return c.waitForTransactionReceipt({ hash, confirmations: 2 }); },
+
+  async findPayment(toAddress, amountUsd, token = 'USDC', opts = {}) {
+    const client = await this.getPublicClient();
+    const t = BASE_TOKENS[token]; if (!t) throw new Error(`Unknown token: ${token}`);
+    const expectedRaw = BigInt(Math.round(amountUsd * (10 ** t.decimals)));
+    const toleranceRaw = BigInt(Math.round((opts.tolerance ?? 0.02) * (10 ** t.decimals)));
+    const currentBlock = await client.getBlockNumber();
+    const fromBlock = opts.fromBlock || (currentBlock - 3600n);
+    const logs = await client.getContractEvents({ address: t.address, abi: ERC20_ABI, eventName: 'Transfer', args: { to: toAddress }, fromBlock, toBlock: 'latest' });
+    for (const log of logs) {
+      const diff = log.args.value > expectedRaw ? log.args.value - expectedRaw : expectedRaw - log.args.value;
+      if (diff <= toleranceRaw) return { txHash: log.transactionHash, from: log.args.from, amount: Number(log.args.value) / (10 ** t.decimals), blockNumber: Number(log.blockNumber), token };
+    }
+    return null;
+  },
+
+  paymentLink(toAddress, amountUsd, token = 'USDC') {
+    const t = BASE_TOKENS[token];
+    return `ethereum:${t.address}@${BASE_CHAIN.id}/transfer?address=${toAddress}&uint256=${BigInt(Math.round(amountUsd * (10 ** t.decimals)))}`;
+  },
+  txUrl(hash) { return `${BASE_CHAIN.blockExplorer}/tx/${hash}`; },
+  addressUrl(addr) { return `${BASE_CHAIN.blockExplorer}/address/${addr}`; },
+  formatAmount(amount, token = 'USDC') { return `${Number(amount).toFixed(2)} ${token}`; },
+
+  onChange(fn) { this._listeners.add(fn); return () => this._listeners.delete(fn); },
+  _notify() {
+    const state = { connected: this.isConnected(), address: this._account, loading: this._loading };
+    for (const fn of this._listeners) { try { fn(state); } catch (e) { console.error('[Crypto]', e); } }
+  },
+};
+
+/* ══════════════════════════════════════ 1. CONFIG ══════════════════════════════════════ */
+const DEFAULT_DB_NAME = 'idb://deliverport';
+const DEMO_DB_NAME = 'idb://deliverport-demo';
+function resolveDbName() {
+  try {
+    const url = new URL(location.href);
+    const raw = url.searchParams.get('db') || '';
+    const slug = raw.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+    if (slug) return `idb://${slug}`;
+    if (url.searchParams.get('demo') === '1') return DEMO_DB_NAME;
+    return DEFAULT_DB_NAME;
+  } catch {
+    return DEFAULT_DB_NAME;
+  }
+}
+
+const APP = (() => {
+  const url = new URL(location.href);
+  return {
+    demo: url.searchParams.get('demo') === '1',
+    debug: url.searchParams.get('debug') === '1',
+    basePath: url.pathname,
+  };
+})();
+
+const CONFIG = {
+  appName: 'DeliverPort',
+  tagline: 'Share work. Get paid on-chain.',
+  dbName: resolveDbName(),
+  schemaVersion: 1,
+  auth: {
+    sessionHours: 72,
+    seedPasswords: {
+      operator: crypto.getRandomValues(new Uint8Array(12)).reduce((s,b) => s + b.toString(36).padStart(2,'0'), '').slice(0,16) + '!A',
+      client:   crypto.getRandomValues(new Uint8Array(12)).reduce((s,b) => s + b.toString(36).padStart(2,'0'), '').slice(0,16) + '!A',
+    },
+  },
+  clientStatuses: ['active','paused'],
+  projectStatuses: ['active','delivery','archived'],
+  invoiceStatuses: ['draft','sent','paid'],
+  payoutRunStatuses: ['draft','queued','completed'],
+  paymentRails: {
+    billing: ['USDC (Base)', 'USDT (Base)', 'Manual'],
+    payouts: ['USDC (Base)', 'USDT (Base)', 'Manual'],
+  },
+  defaultCurrency: 'USD',
+
+  // Freemium tiers
+  plans: {
+    free:  { label: 'Free', maxProjects: 2, canArchive: false, canDeleteProject: false },
+    pro:   { label: 'Pro',  maxProjects: Infinity, canArchive: true, canDeleteProject: true },
+  },
+  defaultPlan: 'free',
+
+  // Supported display currencies. Exchange rates are fetched live from
+  // @fawazahmed0/currency-api (free, no key, CDN-served, 200+ currencies).
+  currencies: [
+    { code: 'USD', symbol: '$',   name: 'US Dollar',        locale: 'en-US' },
+    { code: 'NGN', symbol: '₦',   name: 'Nigerian Naira',   locale: 'en-NG' },
+    { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling',  locale: 'en-KE' },
+    { code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi',    locale: 'en-GH' },
+    { code: 'ZAR', symbol: 'R',   name: 'South African Rand', locale: 'en-ZA' },
+    { code: 'EGP', symbol: 'E£',  name: 'Egyptian Pound',   locale: 'en-EG' },
+    { code: 'EUR', symbol: '€',   name: 'Euro',             locale: 'en-IE' },
+    { code: 'GBP', symbol: '£',   name: 'British Pound',    locale: 'en-GB' },
+    { code: 'CAD', symbol: 'C$',  name: 'Canadian Dollar',  locale: 'en-CA' },
+    { code: 'AUD', symbol: 'A$',  name: 'Australian Dollar', locale: 'en-AU' },
+    { code: 'INR', symbol: '₹',   name: 'Indian Rupee',     locale: 'en-IN' },
+    { code: 'CNY', symbol: '¥',   name: 'Chinese Yuan',     locale: 'zh-CN' },
+  ],
+};
+
+/* ══════════════════════════════════════ 2. ICONS ══════════════════════════════════════ */
+const I = {
+  dash:   `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
+  folder: `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h5l2 2h9a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>`,
+  money:  `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/></svg>`,
+  search: `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`,
+  plus:   `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>`,
+  export: `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>`,
+  check:  `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12l5 5L20 7"/></svg>`,
+  x:      `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 6l12 12M18 6l-12 12"/></svg>`,
+  menu:   `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
+  file:   `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>`,
+  user:   `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>`,
+  users:  `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="7" r="3.5"/><path d="M2 21a7 7 0 0 1 14 0"/><circle cx="17" cy="9" r="2.5"/><path d="M22 21a5 5 0 0 0-7.5-4.3"/></svg>`,
+  db:     `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>`,
+  link:   `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg>`,
+  wallet: `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="17" cy="14" r="1.5"/></svg>`,
+  globe:  `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/></svg>`,
+  shield: `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4Z"/><path d="m9 12 2 2 4-4"/></svg>`,
+  chart:  `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>`,
+  copy:   `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="12" height="12" rx="1.5"/><path d="M5 15H4a1.5 1.5 0 0 1-1.5-1.5V4A1.5 1.5 0 0 1 4 2.5h9.5A1.5 1.5 0 0 1 15 4v1"/></svg>`,
+  sun:    `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>`,
+  moon:   `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5Z"/></svg>`,
+};
+
+/* ══════════════════════════════════════ 3. UTILS ══════════════════════════════════════ */
+const U = {
+  uid: (p='id') => p + '_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4),
+  fmtDate: (iso) => iso ? new Date(iso).toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }) : '—',
+  fmtDay: (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '—',
+  fmtMoney: (n, src, dst) => {
+    const srcCur = src || CONFIG.defaultCurrency || 'USD';
+    const dstCur = dst || Store.state?.displayCurrency || CONFIG.defaultCurrency || 'USD';
+    const converted = FX.convert(Number(n) || 0, srcCur, dstCur);
+    const meta = CONFIG.currencies.find(c => c.code === dstCur) || CONFIG.currencies[0];
+    const hardCurrency = new Set(['USD','EUR','GBP','CAD','AUD']);
+    const frac = hardCurrency.has(dstCur) ? 2 : (Math.abs(converted) < 10 ? 2 : 0);
+    return new Intl.NumberFormat(meta.locale || 'en-US', {
+      style: 'currency', currency: dstCur,
+      maximumFractionDigits: frac, minimumFractionDigits: frac,
+    }).format(converted);
+  },
+  fmtNum: (n) => new Intl.NumberFormat('en-US').format(Number(n) || 0),
+  fmtPct: (n) => (Math.round((Number(n)||0) * 1000) / 10) + '%',
+  clamp: (n, lo, hi) => Math.max(lo, Math.min(hi, n)),
+  norm: (s='') => String(s || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim(),
+  slug: (s='') => String(s || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'export',
+  inferDisplayCurrency: (opts = {}) => {
+    const supported = new Set(CONFIG.currencies.map(c => c.code));
+    const regionToCurrency = {
+      US:'USD', NG:'NGN', KE:'KES', GH:'GHS', ZA:'ZAR', EG:'EGP',
+      GB:'GBP', IE:'EUR', FR:'EUR', DE:'EUR', ES:'EUR', IT:'EUR', NL:'EUR',
+      BE:'EUR', PT:'EUR', AT:'EUR', FI:'EUR', GR:'EUR', LU:'EUR', SI:'EUR',
+      SK:'EUR', LV:'EUR', LT:'EUR', EE:'EUR', CY:'EUR', MT:'EUR', HR:'EUR',
+      CA:'CAD', AU:'AUD', IN:'INR', CN:'CNY',
+    };
+    const timezoneToCurrency = {
+      'Africa/Lagos': 'NGN', 'Africa/Nairobi': 'KES', 'Africa/Accra': 'GHS',
+      'Africa/Johannesburg': 'ZAR', 'Africa/Cairo': 'EGP', 'Europe/London': 'GBP',
+    };
+    const locales = Array.isArray(opts.locales) && opts.locales.length
+      ? opts.locales
+      : [navigator.language, ...(navigator.languages || [])].filter(Boolean);
+    const timezone = opts.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const regionFromLocale = (locale) => {
+      try { return new Intl.Locale(locale).region || null; }
+      catch { const match = String(locale || '').match(/[-_]([A-Za-z]{2})\b/); return match?.[1]?.toUpperCase() || null; }
+    };
+    for (const locale of locales) {
+      const region = regionFromLocale(locale);
+      const code = region && regionToCurrency[region];
+      if (code && supported.has(code)) return code;
+    }
+    const zoneCode = timezoneToCurrency[timezone];
+    if (zoneCode && supported.has(zoneCode)) return zoneCode;
+    return CONFIG.defaultCurrency || 'USD';
+  },
+  avg:  (arr) => arr.length ? arr.reduce((a,b)=>a+Number(b),0)/arr.length : 0,
+  esc:  (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+  debounce: (fn, ms=200) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; },
+  download: (name, mime, data) => {
+    const blob = new Blob([data], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    a.remove(); URL.revokeObjectURL(url);
+  },
+  toCSV: (rows) => {
+    if (!rows.length) return '';
+    const cols = Object.keys(rows[0]);
+    const esc  = v => {
+      if (v == null) return '';
+      const s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+    };
+    return [cols.join(','), ...rows.map(r => cols.map(c => esc(r[c])).join(','))].join('\n');
+  },
+  hashParams: (hash = location.hash || '') => {
+    const idx = String(hash).indexOf('?');
+    const raw = idx >= 0 ? hash.slice(idx + 1) : '';
+    return Object.fromEntries(new URLSearchParams(raw).entries());
+  },
+  setHashParams: (path, params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== '')).toString();
+    return qs ? `${path}?${qs}` : path;
+  },
+  href: (hash = '#/landing', { demo = APP.demo, search = {} } = {}) => {
+    const url = new URL(location.origin + APP.basePath);
+    if (demo) url.searchParams.set('demo', '1');
+    Object.entries(search || {}).forEach(([key, value]) => {
+      if (value == null || value === '') url.searchParams.delete(key);
+      else url.searchParams.set(key, value);
+    });
+    return `${url.pathname}${url.search}${hash}`;
+  },
+  bytesToBase64: (bytes) => btoa(String.fromCharCode(...Array.from(bytes || []))),
+  base64ToBytes: (b64 = '') => Uint8Array.from(atob(String(b64 || '')), c => c.charCodeAt(0)),
+  copyToClipboard: async (text) => {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch { return false; }
+  },
+};
+
+/* ══════════════════════════════════════ 4. AUTH CRYPTO ══════════════════════════════════════ */
+const AuthCrypto = {
+  async hashPassword(password, saltB64 = null, iterations = 120000) {
+    const salt = saltB64 ? U.base64ToBytes(saltB64) : crypto.getRandomValues(new Uint8Array(16));
+    const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(password || '')), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, keyMaterial, 256);
+    const hash = new Uint8Array(bits);
+    return `pbkdf2$${iterations}$${U.bytesToBase64(salt)}$${U.bytesToBase64(hash)}`;
+  },
+  async verifyPassword(password, stored = '') {
+    const [algo, iterations, saltB64, hashB64] = String(stored || '').split('$');
+    if (algo !== 'pbkdf2' || !iterations || !saltB64 || !hashB64) return false;
+    const next = await this.hashPassword(password, saltB64, Number(iterations));
+    return next === stored;
+  },
+};
+
+/* ══════════════════════════════════════ 5. SCHEMA ══════════════════════════════════════ */
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS meta (
+  key   TEXT PRIMARY KEY,
+  value JSONB NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS clients (
+  id               TEXT PRIMARY KEY,
+  name             TEXT NOT NULL,
+  company          TEXT,
+  email            TEXT,
+  country          TEXT,
+  billing_currency TEXT NOT NULL DEFAULT 'USD',
+  status           TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused')),
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+  id           TEXT PRIMARY KEY,
+  client_id    TEXT REFERENCES clients(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  description  TEXT,
+  status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','delivery','archived')),
+  portal_token TEXT UNIQUE,
+  deliverables JSONB,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  start_at     TIMESTAMPTZ,
+  due_at       TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id             TEXT PRIMARY KEY,
+  name           TEXT NOT NULL,
+  email          TEXT NOT NULL UNIQUE,
+  role           TEXT NOT NULL CHECK (role IN ('operator','client')),
+  password_hash  TEXT,
+  auth_status    TEXT NOT NULL DEFAULT 'active',
+  client_id      TEXT REFERENCES clients(id) ON DELETE SET NULL,
+  wallet_address TEXT,
+  phone          TEXT,
+  last_login_at  TIMESTAMPTZ,
+  joined_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id              TEXT PRIMARY KEY,
+  client_id       TEXT REFERENCES clients(id) ON DELETE SET NULL,
+  project_id      TEXT REFERENCES projects(id) ON DELETE SET NULL,
+  status          TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid')),
+  currency        TEXT NOT NULL DEFAULT 'USD',
+  amount          NUMERIC NOT NULL DEFAULT 0,
+  provider        TEXT,
+  external_ref    TEXT,
+  line_items      JSONB,
+  notes           TEXT,
+  payment_address TEXT,
+  chain           TEXT DEFAULT 'base',
+  token           TEXT DEFAULT 'USDC',
+  issued_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  due_at          TIMESTAMPTZ,
+  paid_at         TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS payout_runs (
+  id           TEXT PRIMARY KEY,
+  status       TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','queued','completed')),
+  currency     TEXT NOT NULL DEFAULT 'USD',
+  amount       NUMERIC NOT NULL DEFAULT 0,
+  provider     TEXT,
+  external_ref TEXT,
+  line_items   JSONB,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  queued_at    TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_client   ON projects(client_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_project  ON invoices(project_id);
+CREATE INDEX IF NOT EXISTS idx_payout_runs_state ON payout_runs(status);
+`;
+
+/* ══════════════════════════════════════ 6. SEED DATA ══════════════════════════════════════ */
+const SEED_CLIENTS = [
+  {
+    id: 'c_demo',
+    name: 'Apex Studios',
+    company: 'Apex Studios',
+    email: 'hello@apexstudios.io',
+    country: 'United States',
+    billing_currency: 'USD',
+    status: 'active',
+    notes: 'Demo client for the delivery portal. Brand design & web dev project.',
+  },
+];
+
+const SEED_PROJECTS = [
+  {
+    id: 'p_brand',
+    client_id: 'c_demo',
+    name: 'Brand identity refresh',
+    description: 'Complete brand identity redesign including logo, color system, typography, and brand guidelines document. Phase 1 of a broader website redesign.',
+    status: 'active',
+    portal_token: 'portal-demo-brand',
+    deliverables: JSON.stringify([
+      { name: 'Logo suite (SVG + PNG)', status: 'delivered', note: 'Primary, stacked, icon-only variants' },
+      { name: 'Color system', status: 'delivered', note: '5-color palette with accessibility ratios' },
+      { name: 'Typography guide', status: 'in_progress', note: 'Font pairing, scale, and usage rules' },
+      { name: 'Brand guidelines PDF', status: 'pending', note: 'Final compiled document' },
+    ]),
+  },
+  {
+    id: 'p_web',
+    client_id: 'c_demo',
+    name: 'Marketing website',
+    description: 'Responsive marketing site built on Next.js with CMS integration. 8-page site with blog, case studies, and contact form.',
+    status: 'active',
+    portal_token: 'portal-demo-web',
+    deliverables: JSON.stringify([
+      { name: 'Wireframes', status: 'delivered', note: 'Figma file with 8 page layouts' },
+      { name: 'High-fidelity mockups', status: 'in_progress', note: 'Desktop + mobile for all pages' },
+      { name: 'Development build', status: 'pending', note: 'Next.js + Sanity CMS' },
+      { name: 'QA & launch', status: 'pending', note: 'Cross-browser testing, DNS, deploy' },
+    ]),
+  },
+];
+
+const SEED_USERS = [
+  { id: 'u_operator', name: 'Jordan Rivera', email: 'jordan@deliverport.io', role: 'operator', passwordKey: 'operator', wallet_address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18' },
+  { id: 'u_client',   name: 'Sam Chen',      email: 'sam@apexstudios.io',    role: 'client',   passwordKey: 'client',   client_id: 'c_demo' },
+];
+
+const SEED_INVOICES = [
+  {
+    id: 'inv_001',
+    client_id: 'c_demo',
+    project_id: 'p_brand',
+    status: 'paid',
+    currency: 'USD',
+    amount: 2500,
+    provider: 'USDC (Base)',
+    payment_address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
+    chain: 'base',
+    token: 'USDC',
+    line_items: JSON.stringify([
+      { description: 'Logo suite design', quantity: 1, rate: 1500, amount: 1500 },
+      { description: 'Color system & palette', quantity: 1, rate: 1000, amount: 1000 },
+    ]),
+    notes: 'Phase 1 — logo + color. Paid via USDC on Base.',  // historical note, intentional
+  },
+  {
+    id: 'inv_002',
+    client_id: 'c_demo',
+    project_id: 'p_brand',
+    status: 'sent',
+    currency: 'USD',
+    amount: 1800,
+    provider: 'USDC (Base)',
+    payment_address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
+    chain: 'base',
+    token: 'USDC',
+    line_items: JSON.stringify([
+      { description: 'Typography guide', quantity: 1, rate: 800, amount: 800 },
+      { description: 'Brand guidelines PDF', quantity: 1, rate: 1000, amount: 1000 },
+    ]),
+    notes: 'Phase 2 — typography + guidelines.',
+  },
+];
+
+/* ══════════════════════════════════════ 7. DB — PGlite facade ══════════════════════════════════════ */
+const DB = {
+  pg: null,
+  ready: false,
+
+  async init() {
+    this.pg = new PGlite(CONFIG.dbName);
+    await this.pg.waitReady;
+    await this.pg.exec(SCHEMA);
+    await this.runMigrations();
+    await this.seedIfEmpty();
+    await this.backfillSeedPasswords();
+    this.ready = true;
+  },
+
+  async setWorkspaceKind(kind) {
+    await this.query(
+      `INSERT INTO meta(key,value) VALUES ('workspace_kind', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [JSON.stringify(kind)]
+    );
+  },
+
+  async query(sql, params=[]) {
+    const res = await this.pg.query(sql, params);
+    return res.rows || [];
+  },
+
+  async exec(sql) { return this.pg.exec(sql); },
+
+  async runMigrations() {
+    const [row] = await this.query(`SELECT value FROM meta WHERE key='schema_version'`);
+    const current = Number(row?.value || 0) || 0;
+    if (!row) {
+      await this.query(`INSERT INTO meta(key,value) VALUES ('schema_version', $1::jsonb)`, [String(CONFIG.schemaVersion)]);
+    }
+    // Future migrations go here (if current < 2) { ... }
+    await this.query(
+      `INSERT INTO meta(key,value) VALUES ('schema_version', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [String(CONFIG.schemaVersion)]
+    );
+  },
+
+  async backfillSeedPasswords() {
+    for (const user of SEED_USERS) {
+      const [row] = await this.query(`SELECT id, password_hash FROM users WHERE id = $1`, [user.id]);
+      if (!row) continue;
+      const password = CONFIG.auth.seedPasswords[user.passwordKey || 'operator'] || CONFIG.auth.seedPasswords.operator;
+      const passwordHash = row.password_hash || await AuthCrypto.hashPassword(password);
+      await this.query(
+        `UPDATE users SET password_hash = $2, auth_status = COALESCE(auth_status, 'active'),
+                client_id = COALESCE(client_id, $3), wallet_address = COALESCE(wallet_address, $4)
+          WHERE id = $1`,
+        [user.id, passwordHash, user.client_id || null, user.wallet_address || null]
+      );
+    }
+  },
+
+  async seedDemoWorkspace() {
+    for (const client of SEED_CLIENTS) {
+      await this.query(
+        `INSERT INTO clients(id,name,company,email,country,billing_currency,status,notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [client.id, client.name, client.company || null, client.email || null, client.country || null, client.billing_currency || 'USD', client.status || 'active', client.notes || null]
+      );
+    }
+    for (const project of SEED_PROJECTS) {
+      await this.query(
+        `INSERT INTO projects(id,client_id,name,description,status,portal_token,deliverables)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)`,
+        [project.id, project.client_id, project.name, project.description || null, project.status || 'active', project.portal_token, project.deliverables || null]
+      );
+    }
+    for (const user of SEED_USERS) {
+      const password = CONFIG.auth.seedPasswords[user.passwordKey || 'operator'] || CONFIG.auth.seedPasswords.operator;
+      await this.query(
+        `INSERT INTO users(id,name,email,role,password_hash,client_id,auth_status,wallet_address)
+         VALUES ($1,$2,$3,$4,$5,$6,'active',$7)`,
+        [user.id, user.name, user.email, user.role, await AuthCrypto.hashPassword(password), user.client_id || null, user.wallet_address || null]
+      );
+    }
+    for (const inv of SEED_INVOICES) {
+      const paidAt = inv.status === 'paid' ? new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString() : null;
+      const dueAt = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString();
+      await this.query(
+        `INSERT INTO invoices(id,client_id,project_id,status,currency,amount,provider,payment_address,chain,token,line_items,notes,due_at,paid_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14)`,
+        [inv.id, inv.client_id, inv.project_id, inv.status, inv.currency, inv.amount, inv.provider, inv.payment_address, inv.chain, inv.token, inv.line_items, inv.notes || null, dueAt, paidAt]
+      );
+    }
+    await this.setWorkspaceKind('demo');
+  },
+
+  async isSeedWorkspace() {
+    const [kindRow] = await this.query(`SELECT value FROM meta WHERE key='workspace_kind'`);
+    if (kindRow?.value === 'demo') return true;
+    const rows = await this.query(`SELECT id FROM users ORDER BY id`);
+    if (!rows.length) return false;
+    const seedIds = new Set(SEED_USERS.map(user => user.id));
+    return rows.length === SEED_USERS.length && rows.every(row => seedIds.has(row.id));
+  },
+
+  async seedIfEmpty() {
+    const [{ count: userCount }] = await this.query(`SELECT COUNT(*)::int AS count FROM users`);
+    if (userCount > 0) return;
+    if (APP.demo) {
+      await this.seedDemoWorkspace();
+    } else {
+      await this.setWorkspaceKind('live');
+    }
+  },
+
+  async prepareRealWorkspace() {
+    if (APP.demo) return;
+    if (await this.isSeedWorkspace()) {
+      await this.wipe({ seedDemo: false });
+      return;
+    }
+    await this.setWorkspaceKind('live');
+  },
+
+  expectedSchema() {
+    return {
+      tables: ['meta', 'clients', 'projects', 'users', 'invoices', 'payout_runs'],
+      columns: {
+        users: ['id', 'name', 'email', 'role', 'password_hash', 'auth_status', 'client_id', 'wallet_address', 'phone', 'last_login_at', 'joined_at'],
+        clients: ['id', 'name', 'company', 'email', 'country', 'billing_currency', 'status', 'notes', 'created_at'],
+        projects: ['id', 'client_id', 'name', 'description', 'status', 'portal_token', 'deliverables', 'created_at', 'start_at', 'due_at'],
+        invoices: ['id', 'client_id', 'project_id', 'status', 'currency', 'amount', 'provider', 'external_ref', 'line_items', 'notes', 'payment_address', 'chain', 'token', 'issued_at', 'due_at', 'paid_at'],
+        payout_runs: ['id', 'status', 'currency', 'amount', 'provider', 'external_ref', 'line_items', 'created_at', 'queued_at', 'completed_at'],
+      },
+    };
+  },
+
+  async schemaHealth() {
+    const spec = this.expectedSchema();
+    const tables = await this.query(`SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema')`);
+    const columns = await this.query(`SELECT table_name, column_name FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema')`);
+    const tableSet = new Set(tables.map(row => row.table_name));
+    const columnMap = columns.reduce((acc, row) => { (acc[row.table_name] ||= new Set()).add(row.column_name); return acc; }, {});
+    const missingTables = spec.tables.filter(name => !tableSet.has(name));
+    const missingColumns = Object.entries(spec.columns).flatMap(([table, names]) =>
+      names.filter(name => !(columnMap[table] || new Set()).has(name)).map(name => `${table}.${name}`)
+    );
+    const [schemaRow] = tableSet.has('meta') ? await this.query(`SELECT value FROM meta WHERE key='schema_version'`) : [null];
+    const version = Number(schemaRow?.value || 0) || 0;
+    return {
+      dbName: CONFIG.dbName, version, expectedVersion: CONFIG.schemaVersion,
+      tableCount: spec.tables.length, missingTables, missingColumns,
+      ok: version >= CONFIG.schemaVersion && !missingTables.length && !missingColumns.length,
+    };
+  },
+
+  async repair() {
+    await this.pg.exec(SCHEMA);
+    await this.runMigrations();
+    await this.backfillSeedPasswords();
+    await Store.rehydrate();
+    return this.schemaHealth();
+  },
+
+  async wipe({ seedDemo = APP.demo } = {}) {
+    await this.exec(`
+      DROP TABLE IF EXISTS payout_runs CASCADE;
+      DROP TABLE IF EXISTS invoices CASCADE;
+      DROP TABLE IF EXISTS users CASCADE;
+      DROP TABLE IF EXISTS projects CASCADE;
+      DROP TABLE IF EXISTS clients CASCADE;
+      DROP TABLE IF EXISTS meta CASCADE;
+    `);
+    await this.pg.exec(SCHEMA);
+    await this.runMigrations();
+    if (seedDemo) await this.seedDemoWorkspace();
+    else await this.setWorkspaceKind('live');
+    await this.backfillSeedPasswords();
+  },
+
+  async hardReset(opts = {}) {
+    await this.wipe(opts);
+    await Store.rehydrate();
+    return this.schemaHealth();
+  },
+};
+
+/* ══════════════════════════════════════ 8. FX — live currency conversion ══════════════════════════════════
+   Lightweight, battle-tested FX via @fawazahmed0/currency-api on jsDelivr CDN.
+   - No API key, no rate limits, daily updates, 200+ currencies.
+   - Cached in the meta table for 24h so we don't re-fetch on every reload.
+   - Offline fallback: small hard-coded table keeps the app usable without network.
+   All money is stored in CONFIG.defaultCurrency (USD) and converted at display time.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════════════ */
+const FX = {
+  rates: null,
+  updated: null,
+  cacheHours: 24,
+  primary:  'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
+  fallback: 'https://latest.currency-api.pages.dev/v1/currencies/usd.json',
+
+  offline: {
+    eur: 0.92, gbp: 0.79, ngn: 1550, kes: 129, ghs: 15.5, zar: 18.5, egp: 48,
+    cad: 1.36, aud: 1.52, inr: 83, cny: 7.24, jpy: 150, chf: 0.88,
+  },
+
+  async init() {
+    try {
+      const [row] = await DB.query(`SELECT value FROM meta WHERE key = 'fx_rates'`);
+      if (row?.value?.rates && row.value.updated) {
+        const age = Date.now() - new Date(row.value.updated).getTime();
+        if (age < this.cacheHours * 3600 * 1000) {
+          this.rates = row.value.rates;
+          this.updated = row.value.updated;
+        }
+      }
+    } catch { /* ignore */ }
+    if (!this.rates) await this.refresh();
+    if (!this.rates) {
+      this.rates = { ...this.offline };
+      this.updated = 'offline';
+    }
+  },
+
+  async refresh() {
+    for (const url of [this.primary, this.fallback]) {
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (!data?.usd) throw new Error('bad payload');
+        this.rates = data.usd;
+        this.updated = data.date || new Date().toISOString().slice(0,10);
+        await DB.query(
+          `INSERT INTO meta(key,value) VALUES ('fx_rates', $1::jsonb)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+          [JSON.stringify({ rates: this.rates, updated: new Date().toISOString(), source: url })]
+        );
+        return true;
+      } catch (e) {
+        console.warn('[FX] fetch failed:', url, e.message);
+      }
+    }
+    return false;
+  },
+
+  convert(amount, fromCur = 'USD', toCur = 'USD') {
+    if (!amount || !this.rates) return Number(amount) || 0;
+    const from = String(fromCur).toLowerCase();
+    const to   = String(toCur).toLowerCase();
+    if (from === to) return amount;
+    const rateFrom = from === 'usd' ? 1 : this.rates[from];
+    const rateTo   = to   === 'usd' ? 1 : this.rates[to];
+    if (!rateFrom || !rateTo) return amount;
+    const usdValue = amount / rateFrom;
+    return usdValue * rateTo;
+  },
+
+  rateLabel(toCur) {
+    const to = String(toCur || '').toLowerCase();
+    if (!to || to === 'usd' || !this.rates) return '';
+    const rate = this.rates[to];
+    if (!rate) return '';
+    const pretty = new Intl.NumberFormat('en-US', { maximumFractionDigits: rate < 10 ? 4 : 2 }).format(rate);
+    return `1 USD ≈ ${pretty} ${toCur.toUpperCase()}`;
+  },
+
+  sourceLabel() {
+    if (!this.updated) return 'loading…';
+    if (this.updated === 'offline') return 'offline fallback';
+    return 'updated ' + String(this.updated).slice(0, 10);
+  },
+};
+
+/* ══════════════════════════════════════ 9. STORE — reactive projection ══════════════════════════════════════ */
+const Store = {
+  state: {
+    clients: [],
+    projects: [],
+    invoices: [],
+    payoutRuns: [],
+    users: [],
+    authUserId: null,
+    currentUserId: null,
+    theme: 'light',
+    displayCurrency: 'USD',
+    meta: {},
+  },
+  subs: new Set(),
+
+  async rehydrate() {
+    const [clients, projects, invoices, payoutRuns, users, meta] = await Promise.all([
+      DB.query(`SELECT * FROM clients ORDER BY created_at, name`),
+      DB.query(`SELECT * FROM projects ORDER BY created_at, name`),
+      DB.query(`SELECT * FROM invoices ORDER BY issued_at DESC`),
+      DB.query(`SELECT * FROM payout_runs ORDER BY created_at DESC`),
+      DB.query(`SELECT * FROM users ORDER BY joined_at`),
+      DB.query(`SELECT key, value FROM meta`),
+    ]);
+    const metaMap = Object.fromEntries(meta.map(r => [r.key, r.value]));
+    this.state = {
+      clients,
+      projects: projects.map(normalizeProject),
+      invoices: invoices.map(normalizeInvoice),
+      payoutRuns: payoutRuns.map(normalizePayoutRun),
+      users,
+      authUserId: metaMap.auth_user_id || null,
+      currentUserId: metaMap.current_user || metaMap.auth_user_id || null,
+      theme: metaMap.theme || 'light',
+      displayCurrency: metaMap.display_currency || CONFIG.defaultCurrency || 'USD',
+      meta: metaMap,
+    };
+    this.emit();
+  },
+
+  subscribe(fn) { this.subs.add(fn); return () => this.subs.delete(fn); },
+  emit() { for (const fn of this.subs) fn(this.state); },
+
+  async setCurrentUser(id) {
+    await DB.query(`INSERT INTO meta(key,value) VALUES ('current_user', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(id)]);
+    await this.rehydrate();
+  },
+  async setAuthUser(id) {
+    const startedAt = new Date().toISOString();
+    await DB.query(`INSERT INTO meta(key,value) VALUES ('auth_user_id', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(id)]);
+    await DB.query(`INSERT INTO meta(key,value) VALUES ('auth_started_at', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(startedAt)]);
+    await this.setCurrentUser(id);
+  },
+  async clearSession() {
+    await DB.exec(`DELETE FROM meta WHERE key IN ('auth_user_id','current_user','auth_started_at')`);
+    await this.rehydrate();
+  },
+  async setTheme(theme) {
+    await DB.query(`INSERT INTO meta(key,value) VALUES ('theme', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(theme)]);
+    this.state.theme = theme;
+    this.emit();
+  },
+  async setDisplayCurrency(code) {
+    await DB.query(`INSERT INTO meta(key,value) VALUES ('display_currency', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(code)]);
+    this.state.displayCurrency = code;
+    this.emit();
+  },
+  async setMeta(key, value) {
+    await DB.query(`INSERT INTO meta(key,value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [key, JSON.stringify(value)]);
+    this.state.meta = { ...this.state.meta, [key]: value };
+    this.emit();
+  },
+};
+
+function normalizeProject(p) {
+  let deliverables = p.deliverables;
+  if (typeof deliverables === 'string') {
+    try { deliverables = JSON.parse(deliverables); } catch { deliverables = []; }
+  }
+  return { ...p, deliverables: Array.isArray(deliverables) ? deliverables : [] };
+}
+
+function normalizeInvoice(i) {
+  let line_items = i?.line_items;
+  if (typeof line_items === 'string') {
+    try { line_items = JSON.parse(line_items); } catch { line_items = []; }
+  }
+  return { ...i, amount: i?.amount == null ? 0 : Number(i.amount), line_items: Array.isArray(line_items) ? line_items : [] };
+}
+
+function normalizePayoutRun(run) {
+  let line_items = run?.line_items;
+  if (typeof line_items === 'string') {
+    try { line_items = JSON.parse(line_items); } catch { line_items = []; }
+  }
+  return { ...run, amount: run?.amount == null ? 0 : Number(run.amount), line_items: Array.isArray(line_items) ? line_items : [] };
+}
+
+/* ══════════════════════════════════════ 10. SERVICES ══════════════════════════════════════ */
+const Users = {
+  all: () => Store.state.users,
+  byId: (id) => Store.state.users.find(u => u.id === id),
+  byRole: (role) => Store.state.users.filter(u => u.role === role),
+  current: () => Users.byId(Store.state.currentUserId) || null,
+  auth: () => Users.byId(Store.state.authUserId) || null,
+  async update(id, payload) {
+    const nextEmail = String(payload.email || '').trim();
+    if (nextEmail) {
+      const rows = await DB.query(`SELECT id FROM users WHERE lower(email) = lower($1) AND id <> $2 LIMIT 1`, [nextEmail, id]);
+      if (rows[0]) throw new Error('Another account already uses that email');
+    }
+    await DB.query(
+      `UPDATE users SET name=$2, email=$3, wallet_address=$4, phone=$5 WHERE id=$1`,
+      [id, String(payload.name || '').trim(), nextEmail, String(payload.wallet_address || '').trim() || null, String(payload.phone || '').trim() || null]
+    );
+    await Store.rehydrate();
+    return Users.byId(id);
+  },
+};
+
+function authSessionExpired() {
+  const startedAt = Store.state.meta?.auth_started_at;
+  if (!startedAt || !Store.state.authUserId) return false;
+  const startedMs = Date.parse(startedAt);
+  if (!Number.isFinite(startedMs)) return false;
+  return (Date.now() - startedMs) > (CONFIG.auth.sessionHours * 3600 * 1000);
+}
+
+const Auth = {
+  sampleAccounts() {
+    return [
+      { label: 'Demo operator', email: 'jordan@deliverport.io', password: '••••••••' },
+      { label: 'Demo client', email: 'sam@apexstudios.io', password: '••••••••' },
+    ];
+  },
+  async signIn(email, password) {
+    const [user] = await DB.query(`SELECT * FROM users WHERE lower(email) = lower($1) LIMIT 1`, [String(email || '').trim()]);
+    if (!user) throw new Error('No account found for that email');
+    if (user.auth_status === 'disabled') throw new Error('This account is disabled');
+    const ok = await AuthCrypto.verifyPassword(password, user.password_hash || '');
+    if (!ok) throw new Error('Incorrect password');
+    await DB.query(`UPDATE users SET last_login_at = now() WHERE id = $1`, [user.id]);
+    await Store.setAuthUser(user.id);
+    return Users.byId(user.id) || user;
+  },
+  async signOut() { await Store.clearSession(); },
+  async register({ name, email, password, role = 'operator', wallet_address = '' }) {
+    if (role === 'operator') await DB.prepareRealWorkspace();
+    const [existing] = await DB.query(`SELECT id FROM users WHERE lower(email) = lower($1)`, [email.trim()]);
+    if (existing) throw new Error('An account with that email already exists');
+    const id = U.uid('user');
+    const hash = await AuthCrypto.hashPassword(password);
+    await DB.query(
+      `INSERT INTO users(id,name,email,role,password_hash,auth_status,wallet_address)
+       VALUES ($1,$2,$3,$4,$5,'active',$6)`,
+      [id, name.trim(), email.trim(), role, hash, wallet_address || null]
+    );
+    await DB.setWorkspaceKind?.('live');
+    await Store.setAuthUser(id);
+    return Users.byId(id);
+  },
+};
+
+/* ── Plan / freemium gating ── */
+const Plan = {
+  current() {
+    const key = Store.state.meta?.plan || CONFIG.defaultPlan;
+    return CONFIG.plans[key] || CONFIG.plans.free;
+  },
+  key() { return Store.state.meta?.plan || CONFIG.defaultPlan; },
+  isFree() { return this.key() === 'free'; },
+  canCreateProject() {
+    return Projects.all().length < this.current().maxProjects;
+  },
+  canArchiveProject() { return this.current().canArchive; },
+  canDeleteProject()  { return this.current().canDeleteProject; },
+  projectsRemaining() {
+    const plan = this.current();
+    if (plan.maxProjects === Infinity) return Infinity;
+    return Math.max(0, plan.maxProjects - Projects.all().length);
+  },
+  async upgrade(planKey) {
+    if (!CONFIG.plans[planKey]) throw new Error('Unknown plan');
+    await Store.setMeta('plan', planKey);
+  },
+};
+
+function planBadgeHTML() {
+  const plan = Plan.current();
+  const key = Plan.key();
+  if (key === 'pro') return `<span class="chip chip-indigo"><span class="chip-dot"></span>Pro</span>`;
+  const remaining = Plan.projectsRemaining();
+  const used = plan.maxProjects - remaining;
+  return `<span class="chip ${remaining === 0 ? 'chip-danger' : 'chip-amber'}"><span class="chip-dot"></span>Free · ${used}/${plan.maxProjects} projects</span>`;
+}
+
+const Clients = {
+  all: () => Store.state.clients,
+  byId: (id) => Store.state.clients.find(c => c.id === id),
+  async create(payload) {
+    const id = payload.id || U.uid('client');
+    await DB.query(
+      `INSERT INTO clients(id,name,company,email,country,billing_currency,status,notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [id, payload.name, payload.company || null, payload.email || null, payload.country || null, payload.billing_currency || 'USD', payload.status || 'active', payload.notes || null]
+    );
+    await Store.rehydrate();
+    return id;
+  },
+  async update(id, payload) {
+    await DB.query(
+      `UPDATE clients SET name=$2, company=$3, email=$4, country=$5, billing_currency=$6, status=$7, notes=$8 WHERE id=$1`,
+      [id, payload.name, payload.company || null, payload.email || null, payload.country || null, payload.billing_currency || 'USD', payload.status || 'active', payload.notes || null]
+    );
+    await Store.rehydrate();
+  },
+};
+
+const Projects = {
+  all: () => Store.state.projects,
+  byId: (id) => Store.state.projects.find(p => p.id === id),
+  byClient: (clientId) => Store.state.projects.filter(p => p.client_id === clientId),
+  portalByToken: (token) => Store.state.projects.find(p => p.portal_token === token),
+  forCurrentClient() {
+    const me = Users.current();
+    return me?.client_id ? Projects.byClient(me.client_id) : [];
+  },
+  async create(payload) {
+    if (!Plan.canCreateProject()) {
+      const plan = Plan.current();
+      throw new Error(`Free plan is limited to ${plan.maxProjects} projects. Upgrade to Pro for unlimited projects.`);
+    }
+    const id = payload.id || U.uid('proj');
+    await DB.query(
+      `INSERT INTO projects(id,client_id,name,description,status,portal_token,deliverables,start_at,due_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)`,
+      [id, payload.client_id, payload.name, payload.description || null, payload.status || 'active', payload.portal_token || U.uid('portal'), payload.deliverables ? JSON.stringify(payload.deliverables) : '[]', payload.start_at || null, payload.due_at || null]
+    );
+    await Store.rehydrate();
+    return id;
+  },
+  async update(id, payload) {
+    // Block archiving on free plan
+    if (payload.status === 'archived' && !Plan.canArchiveProject()) {
+      throw new Error('Archiving projects is a Pro feature. Upgrade to manage project lifecycle.');
+    }
+    await DB.query(
+      `UPDATE projects SET name=$2, description=$3, status=$4, deliverables=$5::jsonb, start_at=$6, due_at=$7 WHERE id=$1`,
+      [id, payload.name, payload.description || null, payload.status || 'active', payload.deliverables ? JSON.stringify(payload.deliverables) : '[]', payload.start_at || null, payload.due_at || null]
+    );
+    await Store.rehydrate();
+  },
+  async updateDeliverables(id, deliverables) {
+    await DB.query(`UPDATE projects SET deliverables=$2::jsonb WHERE id=$1`, [id, JSON.stringify(deliverables)]);
+    await Store.rehydrate();
+  },
+};
+
+const Revenue = {
+  invoices: () => Store.state.invoices,
+  payoutRuns: () => Store.state.payoutRuns,
+  visibleToClient(clientId) {
+    return Store.state.invoices.filter(i => i.client_id === clientId && ['sent', 'paid'].includes(i.status));
+  },
+  visibleForProjectShare(projectId) {
+    return Store.state.invoices.filter(i => i.project_id === projectId && ['sent', 'paid'].includes(i.status));
+  },
+
+  async createInvoice({ projectId, clientId, lineItems = [], currency = 'USD', provider = 'USDC (Base)', notes = '', dueDays = 14, paymentAddress = '' }) {
+    const project = projectId ? Projects.byId(projectId) : null;
+    const resolvedClientId = clientId || project?.client_id || null;
+    if (!resolvedClientId) throw new Error('Select a client or project');
+    if (project && clientId && project.client_id !== clientId) throw new Error('Selected project belongs to a different client');
+    const cleanLineItems = lineItems.filter(li => String(li.description || '').trim() && Number(li.amount || 0) > 0);
+    if (!cleanLineItems.length) throw new Error('Add at least one non-zero line item');
+    const amount = cleanLineItems.reduce((sum, li) => sum + (Number(li.amount) || 0), 0);
+    if (amount <= 0) throw new Error('Invoice total must be greater than zero');
+    if (isOnChainRail(provider) && !String(paymentAddress || '').trim()) throw new Error('Add a wallet address before creating this invoice');
+    // Derive chain + token from provider
+    const chain = isOnChainRail(provider) ? 'base' : null;
+    const token = provider === 'USDT (Base)' ? 'USDT' : provider === 'USDC (Base)' ? 'USDC' : null;
+    const id = U.uid('inv');
+    const dueAt = new Date(Date.now() + dueDays * 24 * 3600 * 1000).toISOString();
+    await DB.query(
+      `INSERT INTO invoices(id,client_id,project_id,status,currency,amount,provider,line_items,notes,due_at,payment_address,chain,token)
+       VALUES ($1,$2,$3,'draft',$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12)`,
+      [id, resolvedClientId, projectId || null, currency, amount, provider, JSON.stringify(cleanLineItems), notes || null, dueAt, paymentAddress || null, chain, token]
+    );
+    await Store.rehydrate();
+    return id;
+  },
+
+  async setInvoiceStatus(id, status, extra = {}) {
+    await DB.query(
+      `UPDATE invoices SET status=$2, provider=COALESCE($3,provider), external_ref=COALESCE($4,external_ref),
+              paid_at = CASE WHEN $2='paid' THEN now() ELSE paid_at END WHERE id=$1`,
+      [id, status, extra.provider || null, extra.external_ref || null]
+    );
+    await Store.rehydrate();
+  },
+
+  async deleteInvoice(id) {
+    await DB.query(`DELETE FROM invoices WHERE id=$1`, [id]);
+    await Store.rehydrate();
+  },
+
+  async createPayoutRun({ lineItems = [], currency = 'USD', provider = 'USDC (Base)' } = {}) {
+    const id = U.uid('pay');
+    const amount = lineItems.reduce((sum, li) => sum + (Number(li.amount) || 0), 0);
+    await DB.query(
+      `INSERT INTO payout_runs(id,status,currency,amount,provider,line_items)
+       VALUES ($1,'draft',$2,$3,$4,$5::jsonb)`,
+      [id, currency, amount, provider, JSON.stringify(lineItems)]
+    );
+    await Store.rehydrate();
+    return id;
+  },
+
+  async setPayoutStatus(id, status, extra = {}) {
+    await DB.query(
+      `UPDATE payout_runs SET status=$2, provider=COALESCE($3,provider), external_ref=COALESCE($4,external_ref),
+              queued_at = CASE WHEN $2='queued' THEN COALESCE(queued_at,now()) ELSE queued_at END,
+              completed_at = CASE WHEN $2='completed' THEN now() ELSE completed_at END WHERE id=$1`,
+      [id, status, extra.provider || null, extra.external_ref || null]
+    );
+    await Store.rehydrate();
+  },
+};
+
+/* ══════════════════════════════════════ 11. COMPONENTS ══════════════════════════════════════ */
+const h = (strings, ...values) => {
+  let out = '';
+  strings.forEach((s, i) => { out += s + (values[i] == null ? '' : (Array.isArray(values[i]) ? values[i].join('') : values[i])); });
+  return out;
+};
+
+const Toast = {
+  _t: null,
+  show(msg, kind='ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.style.background = kind === 'err' ? '#7c241a' : 'var(--ink)';
+    el.classList.add('show');
+    clearTimeout(Toast._t);
+    Toast._t = setTimeout(() => el.classList.remove('show'), 2400);
+  }
+};
+
+const Modal = {
+  open(title, innerHtml, opts={}) {
+    const root = document.getElementById('modal-root');
+    root.innerHTML = h`
+      <div class="modal-backdrop" data-close-backdrop>
+        <div class="modal card p-6 anim-in">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <h3 class="h2">${title}</h3>
+            <button class="btn btn-ghost" data-close aria-label="Close">${I.x}</button>
+          </div>
+          ${innerHtml}
+        </div>
+      </div>
+    `;
+    root.querySelector('[data-close-backdrop]').addEventListener('click', (e) => {
+      if (e.target.matches('[data-close-backdrop]')) Modal.close();
+    });
+    root.querySelector('.modal').addEventListener('click', (e) => e.stopPropagation());
+    root.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => Modal.close()));
+    if (opts.onMount) opts.onMount(root);
+  },
+  close() { document.getElementById('modal-root').innerHTML = ''; }
+};
+
+const UI = {
+  statCard(label, value, sub='') {
+    return h`
+      <div class="card p-5 relative overflow-hidden">
+        <div class="text-xs uppercase tracking-wider" style="color:var(--ink-faint)">${label}</div>
+        <div class="mt-2 font-display text-4xl" style="color:var(--ink)">${value}</div>
+        ${sub ? `<div class="mt-1 text-xs" style="color:var(--ink-muted)">${sub}</div>` : ''}
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full" style="background: radial-gradient(circle, color-mix(in srgb, var(--brand) 18%, transparent), transparent 70%)"></div>
+      </div>`;
+  },
+  emptyState(icon, title, body, cta='') {
+    return h`
+      <div class="card p-10 text-center">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full mb-4" style="background:var(--bg-sunken);color:var(--ink-muted)">${icon}</div>
+        <h3 class="h2 mb-1">${title}</h3>
+        <p class="max-w-md mx-auto text-sm" style="color:var(--ink-muted)">${body}</p>
+        ${cta ? `<div class="mt-5">${cta}</div>` : ''}
+      </div>`;
+  },
+  statusChip(status) {
+    const map = {
+      draft:       { cls:'chip-ink',    label:'Draft' },
+      sent:        { cls:'chip-amber',  label:'Sent' },
+      overdue:     { cls:'chip-danger', label:'Overdue' },
+      paid:        { cls:'chip-moss',   label:'Paid' },
+      active:      { cls:'chip-moss',   label:'Active' },
+      delivery:    { cls:'chip-indigo', label:'Delivery' },
+      archived:    { cls:'chip-ink',    label:'Archived' },
+      paused:      { cls:'chip-amber',  label:'Paused' },
+      queued:      { cls:'chip-amber',  label:'Queued' },
+      completed:   { cls:'chip-moss',   label:'Completed' },
+      delivered:   { cls:'chip-moss',   label:'Delivered' },
+      in_progress: { cls:'chip-indigo', label:'In progress' },
+      pending:     { cls:'chip-amber',  label:'Pending' },
+    };
+    const m = map[status] || { cls:'', label: status || '—' };
+    return `<span class="chip ${m.cls}"><span class="chip-dot"></span>${m.label}</span>`;
+  },
+  barChart(items, { max, color='var(--brand)' } = {}) {
+    const m = max || Math.max(1, ...items.map(i => i.value));
+    if (!items.length) return `<div class="text-sm" style="color:var(--ink-muted)">No data yet.</div>`;
+    return `<div class="space-y-3">` + items.map(i => `
+      <div>
+        <div class="flex items-center justify-between text-xs mb-1" style="color:var(--ink-muted)">
+          <span class="truncate">${U.esc(i.label)}</span><span class="font-mono">${i.display != null ? i.display : i.value}</span>
+        </div>
+        <div class="h-2 rounded-full" style="background:var(--bg-sunken)">
+          <div class="bar h-2 rounded-full" style="width:${(i.value/m)*100}%; background:${color}"></div>
+        </div>
+      </div>
+    `).join('') + `</div>`;
+  },
+};
+
+/* ══════════════════════════════════════ 12. PAGES ══════════════════════════════════════ */
+const Pages = {};
+
+function homePathForUser(user) {
+  if (!user) return '#/landing';
+  if (user.role === 'operator') return '#/';
+  if (user.role === 'client') return '#/portal';
+  return '#/';
+}
+
+function sessionNotice() {
+  const params = U.hashParams();
+  const map = {
+    auth: 'Sign in to continue.',
+    expired: 'Your session expired. Sign in to continue where you left off.',
+    client: 'Sign in with your invited client account to continue to your portal.',
+    operator: 'Sign in with your operator workspace to continue.',
+  };
+  return map[params.reason] || '';
+}
+
+function publicHeaderCta(route) {
+  if (route?.page === 'login') {
+    return `<a class="inline-block px-5 py-2 rounded-lg text-sm font-medium" href="${U.href('#/landing', { demo: APP.demo })}" style="background:#fff;color:#09090b">Back home</a>`;
+  }
+  if (route?.page === 'share') {
+    const me = Users.auth();
+    if (me?.role === 'operator') {
+      return `<a class="inline-block px-5 py-2 rounded-lg text-sm font-medium" href="${U.href('#/', { demo: APP.demo })}" style="background:#fff;color:#09090b">Back to workspace</a>`;
+    }
+    if (me?.role === 'client') {
+      return `<a class="inline-block px-5 py-2 rounded-lg text-sm font-medium" href="${U.href('#/portal', { demo: APP.demo })}" style="background:#fff;color:#09090b">Open portal</a>`;
+    }
+    return `<a class="inline-block px-5 py-2 rounded-lg text-sm font-medium" href="${U.href(U.setHashParams('#/login', { intent: 'client', reason: 'client', redirect: '#/portal' }), { demo: APP.demo })}" style="background:#fff;color:#09090b">Client sign in</a>`;
+  }
+  return `<a class="inline-block px-5 py-2 rounded-lg text-sm font-medium" href="${U.href(U.setHashParams('#/login', { tab: 'signin' }), { demo: APP.demo })}" style="background:#fff;color:#09090b">Sign in</a>`;
+}
+
+function onboardingSteps({ me, clients, projects, invoices }) {
+  return [
+    {
+      done: !!me?.wallet_address,
+      title: 'Add your wallet address',
+      body: 'Set the Base address where clients send USDC or USDT.',
+      cta: `<a class="btn" href="#/settings">${I.wallet}<span>${me?.wallet_address ? 'Review wallet' : 'Add wallet'}</span></a>`,
+    },
+    {
+      done: clients.length > 0,
+      title: 'Add your first client',
+      body: 'Create a client profile before you start a project.',
+      cta: `<a class="btn" href="#/clients">${I.users}<span>${clients.length ? 'Manage clients' : 'Add client'}</span></a>`,
+    },
+    {
+      done: projects.length > 0,
+      title: 'Create a project',
+      body: 'Track deliverables and generate a shareable portal link.',
+      cta: `<a class="btn" href="#/projects">${I.folder}<span>${projects.length ? 'Manage projects' : 'Create project'}</span></a>`,
+    },
+    {
+      done: invoices.length > 0,
+      title: 'Send your first invoice',
+      body: 'Create a draft invoice and mark it sent when you are ready.',
+      cta: `<a class="btn" href="#/billing">${I.money}<span>${invoices.length ? 'Open billing' : 'Create invoice'}</span></a>`,
+    },
+  ];
+}
+
+function walletStatus(me) {
+  return me?.wallet_address
+    ? `<div class="text-xs font-mono break-all" style="color:var(--ink-muted)">${U.esc(me.wallet_address)}</div>`
+    : `<div class="text-sm" style="color:var(--ink-muted)">No wallet address set. Add one in Settings so clients know where to pay.</div>`;
+}
+
+function isOnChainRail(provider) {
+  return provider === 'USDC (Base)' || provider === 'USDT (Base)';
+}
+
+function paymentRailLabel(inv) {
+  if (!inv) return 'Manual';
+  return inv.provider || 'Manual';
+}
+
+function invoiceIsOverdue(inv) {
+  if (!inv || inv.status !== 'sent' || !inv.due_at) return false;
+  return Date.parse(inv.due_at) < Date.now();
+}
+
+function invoiceStatusTone(inv) {
+  if (!inv) return 'draft';
+  return invoiceIsOverdue(inv) ? 'overdue' : inv.status;
+}
+
+function invoiceStatusNote(inv) {
+  if (!inv) return '';
+  if (invoiceIsOverdue(inv)) return `Payment overdue since ${U.fmtDay(inv.due_at)}.`;
+  if (inv.status === 'draft') return 'Internal draft — not visible to clients yet.';
+  if (inv.status === 'sent') return inv.due_at ? `Awaiting payment by ${U.fmtDay(inv.due_at)}.` : 'Sent to client and awaiting payment.';
+  if (inv.status === 'paid') return inv.paid_at ? `Paid ${U.fmtDay(inv.paid_at)}.` : 'Payment recorded.';
+  return '';
+}
+
+function renderInvoicePrimaryAction(inv) {
+  if (!inv) return '';
+  if (inv.status === 'draft') return `<button class="btn btn-primary text-xs" data-inv-status="${inv.id}" data-next="sent">${I.export}<span>Mark sent</span></button>`;
+  if (inv.status === 'sent') return `<button class="btn btn-primary text-xs" data-inv-status="${inv.id}" data-next="paid">${I.check}<span>Record payment</span></button>`;
+  return `<span class="text-xs" style="color:var(--ink-muted)">${U.esc(invoiceStatusNote(inv))}</span>`;
+}
+
+function renderInvoicePaymentBlock(inv, { compact = false } = {}) {
+  const due = inv?.due_at ? U.fmtDay(inv.due_at) : '—';
+  const copyBtn = inv?.payment_address ? `<button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.payment_address)}">${I.copy}<span>Copy address</span></button>` : '';
+  return `
+    <div class="space-y-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="chip chip-indigo"><span class="chip-dot"></span>${U.esc(paymentRailLabel(inv))}</span>
+        ${inv?.chain ? `<span class="chip"><span class="chip-dot"></span>${U.esc(String(inv.chain).replace(/^./, m => m.toUpperCase()))}</span>` : ''}
+        <span class="chip"><span class="chip-dot"></span>Due ${U.esc(due)}</span>
+      </div>
+      ${inv?.payment_address ? `<div class="card-flat ${compact ? 'p-2' : 'p-3'}">
+        <div class="text-xs uppercase tracking-wider mb-1" style="color:var(--ink-faint)">Payment address</div>
+        <div class="font-mono text-xs break-all" style="color:var(--ink-muted)">${U.esc(inv.payment_address)}</div>
+      </div>` : ''}
+      ${copyBtn}
+    </div>`;
+}
+
+/* ─────────── LANDING ─────────── */
+Pages.landing = async () => {
+  const previewPortal = U.href(U.setHashParams('#/share', { token: SEED_PROJECTS[0]?.portal_token }), { demo: true });
+  const demoLogin = U.href(U.setHashParams('#/login', { tab: 'signin', intent: 'operator' }), { demo: true });
+  return h`
+    <div class="anim-in">
+      <section class="px-6 md:px-16 pt-24 md:pt-32 pb-16 md:pb-24" style="background:#09090b;color:#fafafa">
+        <div class="max-w-6xl mx-auto grid lg:grid-cols-[1.1fr_.9fr] gap-12 items-start">
+          <div class="max-w-3xl">
+            <div class="text-xs font-mono tracking-widest" style="color:#52525b">DELIVERPORT</div>
+            <h1 class="font-display" style="font-size:clamp(3rem,7vw,5.6rem);line-height:.93;letter-spacing:-.03em;margin-top:1.5rem;color:#fff">
+              Share work.<br/>Get paid in USDC.
+            </h1>
+            <p class="mt-8 leading-relaxed" style="color:#a1a1aa;max-width:560px;font-size:1.05rem">
+              DeliverPort gives freelancers a clean client portal, clear invoice flow, and payment instructions on Base — without sending clients into a maze.
+            </p>
+            <div class="mt-10 flex gap-3 flex-wrap">
+              <a class="inline-block px-5 py-2.5 rounded-lg text-sm font-medium" href="${U.href(U.setHashParams('#/login', { tab: 'register', intent: 'operator' }))}" style="background:#fff;color:#09090b">Create workspace</a>
+              <a class="inline-block px-5 py-2.5 rounded-lg text-sm font-medium" href="${previewPortal}" style="border:1px solid #27272a;color:#d4d4d8">Preview client portal</a>
+              <a class="inline-block px-5 py-2.5 rounded-lg text-sm font-medium" href="${demoLogin}" style="border:1px solid #27272a;color:#a1a1aa">Try demo</a>
+            </div>
+            <div class="mt-12 grid sm:grid-cols-3 gap-4 text-sm">
+              <div class="card-flat p-4" style="background:#111115;border-color:#232329">
+                <div class="text-xs uppercase tracking-wider" style="color:#71717a">For operators</div>
+                <div class="mt-2 font-medium" style="color:#fafafa">Manage projects, clients, invoices, and payouts from one workspace.</div>
+              </div>
+              <div class="card-flat p-4" style="background:#111115;border-color:#232329">
+                <div class="text-xs uppercase tracking-wider" style="color:#71717a">For clients</div>
+                <div class="mt-2 font-medium" style="color:#fafafa">Review progress, deliverables, invoices, and payment details without guesswork.</div>
+              </div>
+              <div class="card-flat p-4" style="background:#111115;border-color:#232329">
+                <div class="text-xs uppercase tracking-wider" style="color:#71717a">Trust first</div>
+                <div class="mt-2 font-medium" style="color:#fafafa">Clear statuses, live FX display, and payment instructions your client can actually follow.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-6 md:p-7" style="background:#111115;border-color:#232329;box-shadow:none">
+            <div class="eyebrow" style="color:#71717a">How it works</div>
+            <div class="mt-4 space-y-5">
+              <div class="card-flat p-4" style="background:#0d0d10;border-color:#232329">
+                <div class="text-xs font-mono tracking-widest" style="color:#52525b">01</div>
+                <div class="font-display text-2xl mt-2" style="color:#fff">Create the workspace</div>
+                <p class="mt-2 text-sm" style="color:#a1a1aa">Add your wallet, client, and project before the first invoice ever goes out.</p>
+              </div>
+              <div class="card-flat p-4" style="background:#0d0d10;border-color:#232329">
+                <div class="text-xs font-mono tracking-widest" style="color:#52525b">02</div>
+                <div class="font-display text-2xl mt-2" style="color:#fff">Share the portal</div>
+                <p class="mt-2 text-sm" style="color:#a1a1aa">Clients get a clear project view with progress, deliverables, and billing history.</p>
+              </div>
+              <div class="card-flat p-4" style="background:#0d0d10;border-color:#232329">
+                <div class="text-xs font-mono tracking-widest" style="color:#52525b">03</div>
+                <div class="font-display text-2xl mt-2" style="color:#fff">Send and collect</div>
+                <p class="mt-2 text-sm" style="color:#a1a1aa">Issue invoices, mark payment progress, and keep the entire story visible end-to-end.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="px-6 md:px-16 py-16 md:py-20">
+        <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-6">
+          <div class="card p-6 md:p-8">
+            <div class="eyebrow">Operator workspace</div>
+            <h2 class="h2 mt-2">Guide yourself through the next right step.</h2>
+            <p class="text-sm mt-3 leading-relaxed" style="color:var(--ink-muted)">Add your wallet, create a client, launch a project, and send your first invoice without losing the thread.</p>
+            <div class="mt-6 space-y-3">
+              <div class="card-flat p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div class="font-medium">Workspace checklist</div>
+                  <div class="text-xs mt-1" style="color:var(--ink-muted)">Wallet, clients, projects, billing</div>
+                </div>
+                <span class="chip chip-indigo"><span class="chip-dot"></span>Built in</span>
+              </div>
+              <div class="card-flat p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div class="font-medium">Contextual billing</div>
+                  <div class="text-xs mt-1" style="color:var(--ink-muted)">Create invoices with visible totals and clear status changes</div>
+                </div>
+                <span class="chip chip-moss"><span class="chip-dot"></span>Safer flow</span>
+              </div>
+            </div>
+          </div>
+          <div class="card p-6 md:p-8">
+            <div class="eyebrow">Client experience</div>
+            <h2 class="h2 mt-2">A portal that keeps clients moving.</h2>
+            <p class="text-sm mt-3 leading-relaxed" style="color:var(--ink-muted)">Shared links and signed-in portals show project progress, invoice status, and payment details with less confusion.</p>
+            <div class="mt-6 space-y-3">
+              <div class="card-flat p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div class="font-medium">Progress and deliverables</div>
+                  <div class="text-xs mt-1" style="color:var(--ink-muted)">Clients always know what is delivered and what is next</div>
+                </div>
+                <span class="chip chip-moss"><span class="chip-dot"></span>Visible</span>
+              </div>
+              <div class="card-flat p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div class="font-medium">Payment instructions</div>
+                  <div class="text-xs mt-1" style="color:var(--ink-muted)">Copy-ready addresses, due dates, and invoice references</div>
+                </div>
+                <span class="chip chip-indigo"><span class="chip-dot"></span>Clear</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="px-6 md:px-16 pb-16 md:pb-20">
+        <div class="max-w-6xl mx-auto card p-6 md:p-8">
+          <div class="grid lg:grid-cols-[1fr_auto] gap-6 items-center">
+            <div>
+              <div class="eyebrow">Why clients trust it</div>
+              <h2 class="h2 mt-2">Show the work. Show the money. Keep the next action obvious.</h2>
+              <p class="text-sm mt-3 leading-relaxed" style="color:var(--ink-muted)">DeliverPort is designed so freelancers can look organized and clients can keep moving without learning your whole toolchain.</p>
+            </div>
+            <div class="flex gap-3 flex-wrap lg:justify-end">
+              <a class="btn btn-primary" href="${U.href(U.setHashParams('#/login', { tab: 'register', intent: 'operator' }))}">${I.export}<span>Start workspace</span></a>
+              <a class="btn" href="${U.href(U.setHashParams('#/login', { tab: 'signin', intent: 'client' }))}">${I.user}<span>Client sign in</span></a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+};
+
+/* ─────────── LOGIN ─────────── */
+Pages.login = async () => {
+  const me = Users.auth();
+  const params = U.hashParams();
+  // If an operator tries to access client login (or vice-versa), sign out first
+  if (me) {
+    const intent = params.intent === 'client' ? 'client' : 'operator';
+    if (me.role !== intent) {
+      await Store.clearSession();
+      // fall through to render login
+    } else {
+      requestAnimationFrame(() => router.go(homePathForUser(me)));
+      return `<div class="max-w-xl mx-auto p-10">Redirecting…</div>`;
+    }
+  }
+  const intent = params.intent === 'client' ? 'client' : 'operator';
+  const isDemo = APP.demo;
+  const allowRegister = intent !== 'client' && !isDemo;
+  const tab = allowRegister && params.tab === 'register' ? 'register' : 'signin';
+  const notice = sessionNotice();
+  const heading = intent === 'client'
+    ? 'Sign in to view your client portal'
+    : tab === 'register'
+      ? 'Create your operator workspace'
+      : 'Sign in to manage projects and billing';
+  const intro = intent === 'client'
+    ? 'Clients sign in with an account provided by their freelancer to review progress, deliverables, and invoices.'
+    : 'Operators manage clients, project portals, invoices, and payout details from one workspace.';
+  const sampleTitle = isDemo ? 'Demo workspace' : 'Explore the sample workspace';
+  return h`
+    <div class="p-6 md:p-10 anim-in">
+      <div class="max-w-6xl mx-auto grid lg:grid-cols-[.96fr_1.04fr] gap-6 items-start">
+        <section class="card p-8">
+          <div class="eyebrow">${intent === 'client' ? 'Client portal' : 'Operator workspace'}</div>
+          <h1 class="h1 mt-2">${heading}</h1>
+          <p class="text-sm mt-3 leading-relaxed" style="color:var(--ink-muted)">${intro}</p>
+          ${notice ? `<div class="mt-5 card-flat p-4 text-sm" style="background:rgba(79,70,229,.08);border-color:rgba(79,70,229,.18);color:var(--ink)">${U.esc(notice)}</div>` : ''}
+
+          <div class="mt-6 grid gap-3">
+            <div class="card-flat p-4">
+              <div class="text-xs uppercase tracking-wider" style="color:var(--ink-faint)">What you can do here</div>
+              <div class="mt-3 space-y-3 text-sm" style="color:var(--ink-muted)">
+                ${intent === 'client'
+                  ? `<div>• Review project status and deliverables</div><div>• Check invoice due dates and payment details</div><div>• Return to shared work without email back-and-forth</div>`
+                  : `<div>• Create a clean workspace for your freelance business</div><div>• Manage clients, projects, invoices, and payout setup</div><div>• Keep demo exploration separate from your real account</div>`}
+              </div>
+            </div>
+
+            ${intent === 'operator' && !isDemo ? `<div class="card-flat p-4">
+              <div class="text-xs uppercase tracking-wider" style="color:var(--ink-faint)">Need to look around first?</div>
+              <div class="mt-2 text-sm" style="color:var(--ink-muted)">Try the sample workspace before creating your own live operator account.</div>
+              <div class="mt-4 flex gap-2 flex-wrap">
+                <a class="btn" href="${U.href(U.setHashParams('#/login', { tab: 'signin', intent: 'operator' }), { demo: true })}">${I.export}<span>Open demo workspace</span></a>
+                <a class="btn btn-ghost" href="${U.href(U.setHashParams('#/share', { token: SEED_PROJECTS[0]?.portal_token }), { demo: true })}">${I.link}<span>Preview client portal</span></a>
+              </div>
+            </div>` : ''}
+          </div>
+        </section>
+
+        <section class="card p-8">
+          <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
+            <div>
+              <div class="eyebrow">${isDemo ? 'Demo mode' : 'Secure access'}</div>
+              <div class="text-sm mt-1" style="color:var(--ink-muted)">${intent === 'client' ? 'Client accounts are sign-in only.' : isDemo ? 'Demo mode is sign-in only. Create a clean workspace from the link below.' : 'Public signup creates operator workspaces only.'}</div>
+            </div>
+            <div id="login-tab-bar" class="flex gap-2" ${allowRegister ? '' : 'style="display:none"'}>
+              <button class="btn ${tab === 'signin' ? 'btn-primary' : ''}" data-tab="signin">Sign in</button>
+              <button class="btn ${tab === 'register' ? 'btn-primary' : ''}" data-tab="register">Create account</button>
+            </div>
+          </div>
+
+          <form id="login-form" class="space-y-4" ${tab === 'signin' ? '' : 'style="display:none"'}>
+            <input type="hidden" name="intent" value="${intent}" />
+            <div>
+              <label class="lbl">Email</label>
+              <input class="field" type="email" name="email" required placeholder="${intent === 'client' ? 'client@example.com' : 'you@example.com'}" />
+            </div>
+            <div>
+              <label class="lbl">Password</label>
+              <input class="field" type="password" name="password" required placeholder="••••••••" />
+            </div>
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <a class="btn btn-ghost" href="${U.href('#/landing', { demo: APP.demo })}">Back</a>
+              <button class="btn btn-primary" type="submit">${intent === 'client' ? 'Sign in to portal' : 'Sign in'}</button>
+            </div>
+            <div id="login-error" class="text-sm" style="color:var(--danger)"></div>
+          </form>
+
+          <form id="register-form" class="space-y-4" ${tab === 'register' && allowRegister ? '' : 'style="display:none"'}>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="lbl">Full name</label>
+                <input class="field" name="name" required placeholder="Jordan Rivera" />
+              </div>
+              <div>
+                <label class="lbl">Email</label>
+                <input class="field" type="email" name="email" required placeholder="you@example.com" />
+              </div>
+            </div>
+            <div>
+              <label class="lbl">Password</label>
+              <input class="field" type="password" name="password" required placeholder="••••••••" minlength="8" />
+            </div>
+            <div>
+              <label class="lbl">Base wallet address (optional)</label>
+              <input class="field" name="wallet" placeholder="0x..." />
+            </div>
+            <div class="text-xs" style="color:var(--ink-muted)">Client accounts are managed inside operator workspaces. Public signup is operator-only.</div>
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <a class="btn btn-ghost" href="${U.href('#/landing', { demo: APP.demo })}">Back</a>
+              <button class="btn btn-primary" type="submit">Create workspace</button>
+            </div>
+            <div id="register-error" class="text-sm" style="color:var(--danger)"></div>
+          </form>
+
+          <details class="mt-6 card-flat p-4" ${isDemo ? 'open' : ''}>
+            <summary class="cursor-pointer font-medium">${sampleTitle}</summary>
+            <div class="mt-4 space-y-3">
+              <div class="text-sm" style="color:var(--ink-muted)">${isDemo ? 'Use these sample accounts to explore locally in this browser.' : 'These sample credentials only work in the local demo workspace.'}</div>
+              ${Auth.sampleAccounts().map(acc => `
+                <button type="button" class="card-flat p-3 w-full text-left" data-demo-email="${U.esc(acc.email)}" data-demo-password="${U.esc(CONFIG.auth.seedPasswords[acc.label.includes('operator') ? 'operator' : 'client'])}">
+                  <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <div class="font-medium">${U.esc(acc.label)}</div>
+                      <div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(acc.email)}</div>
+                    </div>
+                    <div class="text-xs font-mono" style="color:var(--ink-faint)">auto-fill →</div>
+                  </div>
+                </button>
+              `).join('')}
+              ${!isDemo ? `<a class="btn" href="${U.href(U.setHashParams('#/login', { tab: 'signin', intent: 'operator' }), { demo: true })}">${I.export}<span>Open demo mode</span></a>` : `<a class="btn btn-ghost" href="${U.href(U.setHashParams('#/login', { tab: 'register', intent: 'operator' }))}">${I.plus}<span>Create clean workspace</span></a>`}
+            </div>
+          </details>
+        </section>
+      </div>
+    </div>
+  `;
+};
+
+Pages.login.mount = () => {
+  const params = U.hashParams();
+  const intent = params.intent === 'client' ? 'client' : 'operator';
+  const allowRegister = intent !== 'client' && !APP.demo;
+  const loginForm = document.getElementById('login-form');
+  const registerForm = document.getElementById('register-form');
+  const loginError = document.getElementById('login-error');
+  const registerError = document.getElementById('register-error');
+  const tabBtns = document.querySelectorAll('#login-tab-bar [data-tab]');
+  const nextPath = params.redirect || '';
+
+  const setTab = (tab) => {
+    tabBtns.forEach(btn => btn.classList.toggle('btn-primary', btn.dataset.tab === tab));
+    if (loginForm) loginForm.style.display = tab === 'signin' ? '' : 'none';
+    if (registerForm) registerForm.style.display = tab === 'register' && allowRegister ? '' : 'none';
+    if (loginError) loginError.textContent = '';
+    if (registerError) registerError.textContent = '';
+  };
+
+  tabBtns.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
+
+  document.querySelectorAll('[data-demo-email]').forEach(btn => btn.addEventListener('click', () => {
+    loginForm?.elements.namedItem('email') && (loginForm.elements.namedItem('email').value = btn.dataset.demoEmail);
+    loginForm?.elements.namedItem('password') && (loginForm.elements.namedItem('password').value = btn.dataset.demoPassword);
+    setTab('signin');
+  }));
+
+  loginForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    const submitBtn = loginForm.querySelector('[type="submit"]');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Signing in…'; }
+    const fd = new FormData(loginForm);
+    try {
+      const user = await Auth.signIn(fd.get('email'), fd.get('password'));
+      Toast.show(`Signed in as ${user.name}`);
+      if (nextPath && canAccessRoute(findRoute(nextPath), user)) router.go(nextPath);
+      else router.go(homePathForUser(user));
+    } catch (err) { loginError.textContent = err.message || String(err); }
+  });
+
+  registerForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    registerError.textContent = '';
+    const fd = new FormData(registerForm);
+    try {
+      const user = await Auth.register({
+        name: fd.get('name'),
+        email: fd.get('email'),
+        password: fd.get('password'),
+        wallet_address: fd.get('wallet') || '',
+        role: 'operator',
+      });
+      Toast.show(`Workspace created — welcome, ${user.name}!`);
+      router.go('#/');
+    } catch (err) { registerError.textContent = err.message || String(err); }
+  });
+};
+
+function renderProjectRows(projects, { limit = null } = {}) {
+  const invoices = Revenue.invoices();
+  const rows = (limit ? projects.slice(0, limit) : projects).map(project => {
+    const client = Clients.byId(project.client_id);
+    const deliverables = project.deliverables || [];
+    const delivered = deliverables.filter(d => d.status === 'delivered').length;
+    const visibleInvoices = invoices.filter(i => i.project_id === project.id);
+    const collected = visibleInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const outstanding = visibleInvoices.filter(i => i.status === 'sent').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const portalHref = U.href(U.setHashParams('#/share', { token: project.portal_token }), { demo: APP.demo });
+    return `
+      <div class="py-4 flex items-center justify-between gap-4 flex-wrap">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="font-medium">${U.esc(project.name)}</div>
+            ${UI.statusChip(project.status)}
+          </div>
+          <div class="text-xs mt-1" style="color:var(--ink-muted)">
+            ${U.esc(client?.name || '—')} · ${delivered}/${deliverables.length} deliverables · ${U.fmtMoney(outstanding, 'USD')} outstanding · ${U.fmtMoney(collected, 'USD')} collected
+          </div>
+        </div>
+        <div class="flex gap-2 flex-wrap items-center">
+          <a class="btn btn-ghost" href="${portalHref}">${I.link}<span class="hidden sm:inline">Portal</span></a>
+          <button class="btn btn-ghost" data-copy="${U.esc(location.origin + portalHref)}">${I.copy}<span class="hidden sm:inline">Copy link</span></button>
+          <button class="btn btn-ghost" data-edit-project="${project.id}">${I.file}<span class="hidden sm:inline">Edit</span></button>
+          <a class="btn btn-ghost" href="#/billing">${I.money}<span class="hidden sm:inline">Billing</span></a>
+        </div>
+      </div>`;
+  }).join('');
+  return rows ? `<div class="divide-hair">${rows}</div>` : '';
+}
+
+function renderClientRows(clients, { limit = null } = {}) {
+  const invoices = Revenue.invoices();
+  const rows = (limit ? clients.slice(0, limit) : clients).map(client => {
+    const clientProjects = Projects.byClient(client.id);
+    const clientInvoices = invoices.filter(i => i.client_id === client.id);
+    const outstanding = clientInvoices.filter(i => i.status === 'sent').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const collected = clientInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    return `
+      <div class="py-4 flex items-center justify-between gap-4 flex-wrap">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="font-medium">${U.esc(client.name)}</div>
+            ${UI.statusChip(client.status)}
+          </div>
+          <div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(client.email || 'No email yet')} · ${clientProjects.length} project${clientProjects.length === 1 ? '' : 's'} · ${U.fmtMoney(outstanding, 'USD')} outstanding · ${U.fmtMoney(collected, 'USD')} collected</div>
+        </div>
+        <div class="flex gap-2 flex-wrap items-center">
+          <button class="btn btn-ghost" data-edit-client="${client.id}">${I.file}<span class="hidden sm:inline">Edit</span></button>
+          <button class="btn btn-ghost" data-new-project-client="${client.id}">${I.plus}<span class="hidden sm:inline">Project</span></button>
+          <a class="btn btn-ghost" href="#/billing">${I.money}<span class="hidden sm:inline">Billing</span></a>
+        </div>
+      </div>`;
+  }).join('');
+  return rows ? `<div class="divide-hair">${rows}</div>` : '';
+}
+
+/* ─────────── OPERATOR DASHBOARD ─────────── */
+Pages.dashboard = async () => {
+  const me = Users.current();
+  if (!me || me.role !== 'operator') {
+    return `<div class="max-w-4xl mx-auto p-6 md:p-10 anim-in">${UI.emptyState(I.user, 'Operator access only', 'Sign in with an operator account to manage projects and billing.')}</div>`;
+  }
+  const projects = Projects.all();
+  const invoices = Revenue.invoices();
+  const clients = Clients.all();
+  const paidTotal = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+  const pendingTotal = invoices.filter(i => i.status === 'sent').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+  const draftTotal = invoices.filter(i => i.status === 'draft').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+  const steps = onboardingSteps({ me, clients, projects, invoices });
+  const completedSteps = steps.filter(step => step.done).length;
+
+  return h`
+    <div class="p-6 md:p-10 space-y-8 anim-in">
+      <header class="flex items-end justify-between flex-wrap gap-4">
+        <div>
+          <div class="eyebrow">Welcome back, ${U.esc(me.name.split(' ')[0])}</div>
+          <h1 class="h1 mt-1">Your delivery workspace.</h1>
+          <div class="flex items-center gap-2 mt-2">${planBadgeHTML()}</div>
+          <p class="max-w-2xl mt-3 text-sm leading-relaxed" style="color:var(--ink-muted)">
+            Keep clients, projects, invoices, and payout setup in one place — with a clear next step when the workspace is still getting started.
+          </p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <a class="btn" href="#/settings">${I.wallet}<span>Settings</span></a>
+          <a class="btn" href="#/billing">${I.money}<span>Billing</span></a>
+          <button class="btn btn-primary" id="new-project-btn">${I.plus}<span>New project</span></button>
+        </div>
+      </header>
+
+      ${completedSteps < steps.length ? `
+        <section class="card p-6">
+          <div class="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <div class="eyebrow">Workspace checklist</div>
+              <h2 class="h2 mt-1">Complete your setup</h2>
+              <div class="text-sm mt-2" style="color:var(--ink-muted)">${completedSteps}/${steps.length} steps done. Finish the basics before your first payment request goes out.</div>
+            </div>
+            <span class="chip chip-indigo"><span class="chip-dot"></span>${steps.length - completedSteps} to go</span>
+          </div>
+          <div class="grid md:grid-cols-2 gap-4 mt-5">
+            ${steps.map(step => `
+              <div class="card-flat p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="font-medium">${U.esc(step.title)}</div>
+                    <div class="text-sm mt-1" style="color:var(--ink-muted)">${U.esc(step.body)}</div>
+                  </div>
+                  <span class="chip ${step.done ? 'chip-moss' : 'chip-indigo'}"><span class="chip-dot"></span>${step.done ? 'Done' : 'Next'}</span>
+                </div>
+                <div class="mt-4">${step.cta}</div>
+              </div>`).join('')}
+          </div>
+        </section>` : ''}
+
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        ${UI.statCard('Collected', U.fmtMoney(paidTotal, 'USD'), `${invoices.filter(i => i.status === 'paid').length} paid invoice${invoices.filter(i => i.status === 'paid').length === 1 ? '' : 's'}`)}
+        ${UI.statCard('Pending', U.fmtMoney(pendingTotal, 'USD'), `${invoices.filter(i => i.status === 'sent').length} sent`)}
+        ${UI.statCard('Drafts', U.fmtMoney(draftTotal, 'USD'), `${invoices.filter(i => i.status === 'draft').length} draft${invoices.filter(i => i.status === 'draft').length === 1 ? '' : 's'}`)}
+        ${UI.statCard('Clients', U.fmtNum(clients.length), `${projects.length} project${projects.length === 1 ? '' : 's'}`)}
+      </section>
+
+      <section class="grid md:grid-cols-3 gap-4">
+        <a href="#/settings" class="card p-6 block hover:shadow-lg transition">
+          <div class="flex items-center gap-3 mb-3"><div style="color:var(--brand)">${I.wallet}</div><div class="font-semibold">Payout setup</div></div>
+          ${walletStatus(me)}
+        </a>
+        <a href="#/clients" class="card p-6 block hover:shadow-lg transition">
+          <div class="flex items-center gap-3 mb-3"><div style="color:var(--brand)">${I.users}</div><div class="font-semibold">Clients</div></div>
+          <div class="text-sm" style="color:var(--ink-muted)">${clients.length ? `${clients.length} client${clients.length === 1 ? '' : 's'} in your roster.` : 'Start by adding your first client.'}</div>
+        </a>
+        <a href="#/projects" class="card p-6 block hover:shadow-lg transition">
+          <div class="flex items-center gap-3 mb-3"><div style="color:var(--brand)">${I.folder}</div><div class="font-semibold">Projects</div></div>
+          <div class="text-sm" style="color:var(--ink-muted)">${projects.length ? `${projects.length} project${projects.length === 1 ? '' : 's'} active or archived.` : 'Create a project and generate a shareable portal.'}</div>
+          <div class="text-xs mt-2" style="color:var(--ink-faint)">${FX.rateLabel(Store.state.displayCurrency) || 'Displaying in USD'} · ${FX.sourceLabel()}</div>
+        </a>
+      </section>
+
+      <section class="card p-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <div class="eyebrow">Projects</div>
+            <h2 class="h2">Active work</h2>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <a class="btn btn-ghost" href="#/projects">View all</a>
+            <button class="btn" id="new-project-btn-2">${I.plus}<span>New project</span></button>
+          </div>
+        </div>
+        ${projects.length ? renderProjectRows(projects, { limit: 4 }) : UI.emptyState(I.folder, 'No projects yet', 'Create your first project to start tracking deliverables and sending invoices.', `<button class="btn btn-primary" id="new-project-empty">${I.plus}<span>New project</span></button>`)}
+      </section>
+
+      <section class="card p-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <div class="eyebrow">Clients</div>
+            <h2 class="h2">Your client roster</h2>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <a class="btn btn-ghost" href="#/clients">View all</a>
+            <button class="btn" id="new-client-btn">${I.plus}<span>New client</span></button>
+          </div>
+        </div>
+        ${clients.length ? renderClientRows(clients, { limit: 4 }) : UI.emptyState(I.users, 'No clients yet', 'Add your first client before you create a project or invoice.', `<button class="btn btn-primary" id="new-client-empty">${I.plus}<span>New client</span></button>`)}
+      </section>
+    </div>
+  `;
+};
+
+function openNewProjectModal(prefill = {}) {
+  if (!Plan.canCreateProject()) {
+    const plan = Plan.current();
+    Modal.open('Project limit reached', h`
+      <div class="space-y-4">
+        <div class="card-flat p-5 text-center">
+          <div class="font-display text-5xl" style="color:var(--brand)">${plan.maxProjects}/${plan.maxProjects}</div>
+          <div class="text-sm mt-2" style="color:var(--ink-muted)">You’ve used both projects on the Free plan.</div>
+        </div>
+        <div class="card-flat p-4">
+          <div class="font-medium">Upgrade to Pro</div>
+          <div class="text-sm mt-1" style="color:var(--ink-muted)">Unlimited projects, archive old work, and full workspace controls.</div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" data-close>Close</button>
+          <button type="button" class="btn btn-primary" id="upgrade-to-pro">${I.export}<span>Upgrade to Pro</span></button>
+        </div>
+      </div>
+    `, {
+      onMount: (root) => {
+        root.querySelector('#upgrade-to-pro')?.addEventListener('click', async () => {
+          await Plan.upgrade('pro');
+          Modal.close();
+          Toast.show('Upgraded to Pro — unlimited projects');
+          await router.render();
+        });
+      }
+    });
+    return;
+  }
+  const clients = Clients.all();
+  Modal.open('New project', h`
+    <form id="modal-form" class="space-y-4">
+      <div>
+        <label class="lbl">Client</label>
+        <select class="field" name="client_id" required>
+          <option value="">Select client…</option>
+          ${clients.map(c => `<option value="${c.id}" ${c.id === prefill.client_id ? 'selected' : ''}>${U.esc(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="lbl">Project name</label>
+        <input class="field" name="name" required placeholder="Brand identity refresh" value="${U.esc(prefill.name || '')}" />
+      </div>
+      <div>
+        <label class="lbl">Description</label>
+        <textarea class="field" name="description" placeholder="Brief description of the project scope…">${U.esc(prefill.description || '')}</textarea>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create project</button>
+      </div>
+    </form>
+  `, {
+    onMount: (root) => {
+      root.querySelector('#modal-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        try {
+          await Projects.create({
+            client_id: fd.get('client_id'),
+            name: fd.get('name'),
+            description: fd.get('description'),
+          });
+          Modal.close();
+          Toast.show('Project created');
+          await router.render();
+        } catch (err) { Toast.show(err.message, 'err'); }
+      });
+    }
+  });
+}
+
+function openClientModal(clientId = null) {
+  const existing = clientId ? Clients.byId(clientId) : null;
+  Modal.open(existing ? 'Edit client' : 'New client', h`
+    <form id="modal-form" class="space-y-4">
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="lbl">Name</label>
+          <input class="field" name="name" required placeholder="Apex Studios" value="${U.esc(existing?.name || '')}" />
+        </div>
+        <div>
+          <label class="lbl">Email</label>
+          <input class="field" type="email" name="email" placeholder="hello@apexstudios.io" value="${U.esc(existing?.email || '')}" />
+        </div>
+        <div>
+          <label class="lbl">Company</label>
+          <input class="field" name="company" placeholder="Apex Studios" value="${U.esc(existing?.company || '')}" />
+        </div>
+        <div>
+          <label class="lbl">Country</label>
+          <input class="field" name="country" placeholder="United States" value="${U.esc(existing?.country || '')}" />
+        </div>
+      </div>
+      <div>
+        <label class="lbl">Notes</label>
+        <textarea class="field" name="notes" placeholder="Any extra context…">${U.esc(existing?.notes || '')}</textarea>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">${existing ? 'Save client' : 'Create client'}</button>
+      </div>
+    </form>
+  `, {
+    onMount: (root) => {
+      root.querySelector('#modal-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        try {
+          const payload = {
+            name: fd.get('name'),
+            email: fd.get('email'),
+            company: fd.get('company'),
+            country: fd.get('country'),
+            notes: fd.get('notes'),
+          };
+          if (existing) {
+            await DB.query(`UPDATE clients SET name=$2, email=$3, company=$4, country=$5, notes=$6 WHERE id=$1`, [existing.id, payload.name, payload.email || null, payload.company || null, payload.country || null, payload.notes || null]);
+            await Store.rehydrate();
+            Toast.show('Client updated');
+          } else {
+            await Clients.create(payload);
+            Toast.show('Client created');
+          }
+          Modal.close();
+          await router.render();
+        } catch (err) { Toast.show(err.message, 'err'); }
+      });
+    }
+  });
+}
+
+function openEditProjectModal(projectId) {
+  const project = Projects.byId(projectId);
+  if (!project) return;
+  const deliverables = project.deliverables || [];
+  const shareHref = U.href(U.setHashParams('#/share', { token: project.portal_token }), { demo: APP.demo });
+  Modal.open('Edit project', h`
+    <form id="modal-form" class="space-y-4">
+      <div class="card-flat p-3 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div class="text-xs uppercase tracking-wider" style="color:var(--ink-faint)">Client portal</div>
+          <div class="text-sm mt-1" style="color:var(--ink-muted)">${U.esc(shareHref)}</div>
+        </div>
+        <button type="button" class="btn btn-ghost" data-copy="${U.esc(location.origin + shareHref)}">${I.copy}<span>Copy link</span></button>
+      </div>
+      <div>
+        <label class="lbl">Project name</label>
+        <input class="field" name="name" required value="${U.esc(project.name)}" />
+      </div>
+      <div>
+        <label class="lbl">Description</label>
+        <textarea class="field" name="description">${U.esc(project.description || '')}</textarea>
+      </div>
+      <div>
+        <label class="lbl">Status</label>
+        <select class="field" name="status">
+          ${CONFIG.projectStatuses
+            .filter(s => s !== 'archived' || Plan.canArchiveProject() || project.status === 'archived')
+            .map(s => `<option value="${s}" ${s === project.status ? 'selected' : ''}>${s}</option>`).join('')}
+          ${!Plan.canArchiveProject() && project.status !== 'archived' ? `<option disabled style="color:var(--ink-faint)">Archived (Pro)</option>` : ''}
+        </select>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="lbl" style="margin-bottom:0">Deliverables</label>
+          <button type="button" class="btn btn-ghost text-xs" id="add-deliverable">${I.plus} Add</button>
+        </div>
+        <div id="deliverables-list" class="space-y-2">
+          ${deliverables.map((d, i) => `
+            <div class="card-flat p-3 space-y-2" data-del-idx="${i}">
+              <div class="grid grid-cols-[1fr_auto] gap-2">
+                <input class="field" name="del_name_${i}" value="${U.esc(d.name)}" placeholder="Deliverable name" />
+                <select class="field" name="del_status_${i}" style="max-width:140px">
+                  <option value="pending" ${d.status==='pending'?'selected':''}>Pending</option>
+                  <option value="in_progress" ${d.status==='in_progress'?'selected':''}>In progress</option>
+                  <option value="delivered" ${d.status==='delivered'?'selected':''}>Delivered</option>
+                </select>
+              </div>
+              <input class="field" name="del_note_${i}" value="${U.esc(d.note || '')}" placeholder="Notes (optional)" />
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  `, {
+    onMount: (root) => {
+      let delCount = deliverables.length;
+      root.querySelector('[data-copy]')?.addEventListener('click', async () => {
+        await U.copyToClipboard(location.origin + shareHref);
+        Toast.show('Share link copied');
+      });
+      root.querySelector('#add-deliverable').addEventListener('click', () => {
+        const list = root.querySelector('#deliverables-list');
+        const idx = delCount++;
+        list.insertAdjacentHTML('beforeend', `
+          <div class="card-flat p-3 space-y-2" data-del-idx="${idx}">
+            <div class="grid grid-cols-[1fr_auto] gap-2">
+              <input class="field" name="del_name_${idx}" placeholder="Deliverable name" />
+              <select class="field" name="del_status_${idx}" style="max-width:140px">
+                <option value="pending">Pending</option>
+                <option value="in_progress">In progress</option>
+                <option value="delivered">Delivered</option>
+              </select>
+            </div>
+            <input class="field" name="del_note_${idx}" placeholder="Notes (optional)" />
+          </div>`);
+      });
+      root.querySelector('#modal-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const newDeliverables = [];
+        for (let i = 0; i < delCount; i++) {
+          const name = String(fd.get(`del_name_${i}`) || '').trim();
+          if (!name) continue;
+          newDeliverables.push({ name, status: fd.get(`del_status_${i}`) || 'pending', note: fd.get(`del_note_${i}`) || '' });
+        }
+        try {
+          await Projects.update(projectId, {
+            name: fd.get('name'),
+            description: fd.get('description'),
+            status: fd.get('status'),
+            deliverables: newDeliverables,
+            start_at: project.start_at,
+            due_at: project.due_at,
+          });
+          Modal.close();
+          Toast.show('Project updated');
+          await router.render();
+        } catch (err) { Toast.show(err.message, 'err'); }
+      });
+    }
+  });
+}
+
+function bindOperatorWorkspaceActions() {
+  const openNew = () => openNewProjectModal();
+  document.getElementById('new-project-btn')?.addEventListener('click', openNew);
+  document.getElementById('new-project-btn-2')?.addEventListener('click', openNew);
+  document.getElementById('new-project-empty')?.addEventListener('click', openNew);
+  document.querySelectorAll('[data-new-project-client]').forEach(btn => btn.addEventListener('click', () => openNewProjectModal({ client_id: btn.dataset.newProjectClient })));
+  document.getElementById('new-client-btn')?.addEventListener('click', () => openClientModal());
+  document.getElementById('new-client-empty')?.addEventListener('click', () => openClientModal());
+  document.querySelectorAll('[data-edit-project]').forEach(btn => btn.addEventListener('click', () => openEditProjectModal(btn.dataset.editProject)));
+  document.querySelectorAll('[data-edit-client]').forEach(btn => btn.addEventListener('click', () => openClientModal(btn.dataset.editClient)));
+  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    await U.copyToClipboard(btn.dataset.copy);
+    Toast.show('Copied');
+  }));
+  document.getElementById('repair-btn')?.addEventListener('click', async () => {
+    try {
+      const health = await DB.repair();
+      Toast.show(health.ok ? 'Workspace repaired' : 'Repair ran — check health');
+      await router.render();
+    } catch (err) { Toast.show('Repair failed: ' + err.message, 'err'); }
+  });
+  document.getElementById('reset-btn')?.addEventListener('click', async () => {
+    if (!confirm(APP.demo ? 'Reset demo data for this browser?' : 'Reset the local workspace for this browser? This cannot be undone.')) return;
+    try {
+      await DB.hardReset({ seedDemo: APP.demo });
+      Toast.show(APP.demo ? 'Demo data reset' : 'Workspace reset');
+      await router.render();
+    } catch (err) { Toast.show('Reset failed: ' + err.message, 'err'); }
+  });
+}
+
+Pages.dashboard.mount = bindOperatorWorkspaceActions;
+
+Pages.projects = async () => {
+  const me = Users.current();
+  if (!me || me.role !== 'operator') {
+    return `<div class="max-w-4xl mx-auto p-6 md:p-10 anim-in">${UI.emptyState(I.folder, 'Operator access only', 'Sign in with an operator account to manage projects.')}</div>`;
+  }
+  const projects = Projects.all();
+  return h`
+    <div class="p-6 md:p-10 space-y-8 anim-in">
+      <header class="flex items-end justify-between flex-wrap gap-4">
+        <div>
+          <div class="eyebrow">Projects</div>
+          <h1 class="h1">Project portfolio</h1>
+          <div class="flex items-center gap-2 mt-2">${planBadgeHTML()}</div>
+          <p class="text-sm mt-2" style="color:var(--ink-muted)">Track deliverables, copy portal links, and jump into billing without going back to the dashboard.</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <a class="btn" href="#/">${I.dash}<span>Dashboard</span></a>
+          <button class="btn btn-primary" id="new-project-btn">${I.plus}<span>New project</span></button>
+        </div>
+      </header>
+      <section class="card p-6">
+        ${projects.length ? renderProjectRows(projects) : UI.emptyState(I.folder, 'No projects yet', 'Create your first project to start sharing work and billing clients.', `<button class="btn btn-primary" id="new-project-empty">${I.plus}<span>New project</span></button>`)}
+      </section>
+    </div>`;
+};
+Pages.projects.mount = bindOperatorWorkspaceActions;
+
+Pages.clients = async () => {
+  const me = Users.current();
+  if (!me || me.role !== 'operator') {
+    return `<div class="max-w-4xl mx-auto p-6 md:p-10 anim-in">${UI.emptyState(I.users, 'Operator access only', 'Sign in with an operator account to manage clients.')}</div>`;
+  }
+  const clients = Clients.all();
+  return h`
+    <div class="p-6 md:p-10 space-y-8 anim-in">
+      <header class="flex items-end justify-between flex-wrap gap-4">
+        <div>
+          <div class="eyebrow">Clients</div>
+          <h1 class="h1">Client roster</h1>
+          <p class="text-sm mt-3" style="color:var(--ink-muted)">See every client, open follow-on project creation, and keep billing context close at hand.</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <a class="btn" href="#/">${I.dash}<span>Dashboard</span></a>
+          <button class="btn btn-primary" id="new-client-btn">${I.plus}<span>New client</span></button>
+        </div>
+      </header>
+      <section class="card p-6">
+        ${clients.length ? renderClientRows(clients) : UI.emptyState(I.users, 'No clients yet', 'Add your first client before creating a project or invoice.', `<button class="btn btn-primary" id="new-client-empty">${I.plus}<span>New client</span></button>`)}
+      </section>
+    </div>`;
+};
+Pages.clients.mount = bindOperatorWorkspaceActions;
+
+Pages.settings = async () => {
+  const me = Users.current();
+  if (!me || me.role !== 'operator') {
+    return `<div class="max-w-4xl mx-auto p-6 md:p-10 anim-in">${UI.emptyState(I.wallet, 'Operator access only', 'Sign in with an operator account to manage workspace settings.')}</div>`;
+  }
+  const defaults = Store.state.meta || {};
+  return h`
+    <div class="p-6 md:p-10 space-y-8 anim-in">
+      <header class="flex items-end justify-between flex-wrap gap-4">
+        <div>
+          <div class="eyebrow">Settings</div>
+          <h1 class="h1">Operator profile + billing defaults</h1>
+          <p class="text-sm mt-3" style="color:var(--ink-muted)">Set your payout wallet, default invoice behavior, and local workspace controls in one place.</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <a class="btn" href="#/">${I.dash}<span>Dashboard</span></a>
+          <a class="btn" href="#/billing">${I.money}<span>Billing</span></a>
+        </div>
+      </header>
+
+      <section class="card p-6">
+        <div class="eyebrow">Profile</div>
+        <h2 class="h2 mt-1">Operator details</h2>
+        <form id="settings-profile-form" class="grid md:grid-cols-2 gap-4 mt-5">
+          <div>
+            <label class="lbl">Full name</label>
+            <input class="field" name="name" required value="${U.esc(me.name || '')}" />
+          </div>
+          <div>
+            <label class="lbl">Email</label>
+            <input class="field" type="email" name="email" required value="${U.esc(me.email || '')}" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="lbl">Base wallet address</label>
+            <input class="field" name="wallet_address" placeholder="0x..." value="${U.esc(me.wallet_address || '')}" />
+          </div>
+          <div class="md:col-span-2 flex justify-end">
+            <button class="btn btn-primary" type="submit">Save profile</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card p-6">
+        <div class="eyebrow">Billing defaults</div>
+        <h2 class="h2 mt-1">New invoice presets</h2>
+        <form id="settings-defaults-form" class="grid md:grid-cols-2 gap-4 mt-5">
+          <div>
+            <label class="lbl">Display currency</label>
+            <select class="field" name="display_currency">${CONFIG.currencies.map(c => `<option value="${c.code}" ${c.code === Store.state.displayCurrency ? 'selected' : ''}>${c.code}</option>`).join('')}</select>
+          </div>
+          <div>
+            <label class="lbl">Default invoice currency</label>
+            <select class="field" name="default_billing_currency">${CONFIG.currencies.map(c => `<option value="${c.code}" ${c.code === (defaults.default_billing_currency || CONFIG.defaultCurrency) ? 'selected' : ''}>${c.code}</option>`).join('')}</select>
+          </div>
+          <div>
+            <label class="lbl">Default due days</label>
+            <input class="field" type="number" min="1" max="90" name="default_due_days" value="${U.esc(String(defaults.default_due_days || 14))}" />
+          </div>
+          <div>
+            <label class="lbl">Preferred payment rail</label>
+            <select class="field" name="default_billing_rail">
+              ${CONFIG.paymentRails.billing.map(option => `<option value="${option}" ${option === (defaults.default_billing_rail || 'USDC (Base)') ? 'selected' : ''}>${option}</option>`).join('')}
+            </select>
+          </div>
+          <div class="md:col-span-2 flex justify-end">
+            <button class="btn btn-primary" type="submit">Save defaults</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card p-6">
+        <div class="eyebrow">Plan</div>
+        <h2 class="h2 mt-1">Workspace plan</h2>
+        <div class="card-flat p-5 mt-4 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div class="flex items-center gap-2">
+              <div class="font-medium">${Plan.current().label} plan</div>
+              ${planBadgeHTML()}
+            </div>
+            <div class="text-sm mt-2" style="color:var(--ink-muted)">
+              ${Plan.isFree()
+                ? `${Plan.projectsRemaining()} of ${Plan.current().maxProjects} project slots remaining. Free plan projects cannot be archived or deleted.`
+                : 'Unlimited projects. Archive, delete, and full workspace controls.'}
+            </div>
+          </div>
+          ${Plan.isFree() ? `<button class="btn btn-primary" id="settings-upgrade">${I.export}<span>Upgrade to Pro</span></button>` : `<span class="chip chip-moss"><span class="chip-dot"></span>Active</span>`}
+        </div>
+      </section>
+
+      <section class="card p-6">
+        <div class="eyebrow">Advanced</div>
+        <h2 class="h2 mt-1">Local workspace controls</h2>
+        <div class="text-sm mt-3" style="color:var(--ink-muted)">These controls affect only the current browser workspace.</div>
+        <div class="card-flat p-4 mt-5 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div class="text-xs uppercase tracking-wider" style="color:var(--ink-faint)">Workspace store</div>
+            <div class="font-mono text-xs mt-1" style="color:var(--ink-muted)">${U.esc(CONFIG.dbName)}</div>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <button class="btn" id="repair-btn">Repair workspace</button>
+            <button class="btn btn-danger" id="reset-btn">${APP.demo ? 'Reset demo data' : 'Reset local workspace'}</button>
+          </div>
+        </div>
+      </section>
+    </div>`;
+};
+Pages.settings.mount = () => {
+  bindOperatorWorkspaceActions();
+  document.getElementById('settings-profile-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await Users.update(Store.state.authUserId, {
+        name: fd.get('name'),
+        email: fd.get('email'),
+        wallet_address: fd.get('wallet_address'),
+      });
+      Toast.show('Profile updated');
+      await router.render();
+    } catch (err) { Toast.show(err.message, 'err'); }
+  });
+  document.getElementById('settings-defaults-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await Store.setDisplayCurrency(fd.get('display_currency'));
+      await Store.setMeta('default_billing_currency', fd.get('default_billing_currency'));
+      await Store.setMeta('default_due_days', Number(fd.get('default_due_days')) || 14);
+      await Store.setMeta('default_billing_rail', fd.get('default_billing_rail'));
+      Toast.show('Defaults saved');
+      await router.render();
+    } catch (err) { Toast.show(err.message, 'err'); }
+  });
+  document.getElementById('settings-upgrade')?.addEventListener('click', async () => {
+    await Plan.upgrade('pro');
+    Toast.show('Upgraded to Pro — unlimited projects');
+    await router.render();
+  });
+};
+
+/* ─────────── BILLING ─────────── */
+Pages.billing = async () => {
+  const me = Users.current();
+  if (!me || me.role !== 'operator') {
+    return `<div class="max-w-4xl mx-auto p-6 md:p-10 anim-in">${UI.emptyState(I.money, 'Operator access only', 'Sign in with an operator account to manage billing.')}</div>`;
+  }
+  const clients = Clients.all();
+  const projects = Projects.all();
+  const invoices = [...Revenue.invoices()].sort((a, b) => {
+    const order = { overdue: 0, sent: 1, draft: 2, paid: 3 };
+    return (order[invoiceStatusTone(a)] ?? 9) - (order[invoiceStatusTone(b)] ?? 9)
+      || Date.parse(a.due_at || 0) - Date.parse(b.due_at || 0)
+      || Date.parse(b.issued_at || 0) - Date.parse(a.issued_at || 0);
+  });
+  const payoutRuns = Revenue.payoutRuns();
+  const paidTotal = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.amount || 0), 0);
+  const sentTotal = invoices.filter(i => i.status === 'sent').reduce((s, i) => s + Number(i.amount || 0), 0);
+  const draftTotal = invoices.filter(i => i.status === 'draft').reduce((s, i) => s + Number(i.amount || 0), 0);
+  const allTotal = invoices.reduce((s, i) => s + Number(i.amount || 0), 0);
+  const invoiceEmptyState = !clients.length
+    ? UI.emptyState(I.money, 'No invoices yet', 'Add a client first. Once clients and projects exist, your draft invoices will live here until you send them.', `<a class="btn btn-primary" href="#/clients">${I.plus}<span>Add client</span></a>`)
+    : !projects.length
+      ? UI.emptyState(I.money, 'No invoices yet', 'You have a client ready. Create a project so invoice history stays attached to deliverables and the client portal.', `<a class="btn btn-primary" href="#/projects">${I.plus}<span>Create project</span></a>`)
+      : UI.emptyState(I.money, 'No invoices yet', 'Your workspace is ready. Start with a draft invoice, review the payment details, then mark it sent when you are ready.', `<button class="btn btn-primary" id="new-invoice-btn-empty">${I.plus}<span>Create first draft</span></button>`);
+
+  return h`
+    <div class="p-6 md:p-10 space-y-8 anim-in">
+      <header class="flex items-end justify-between flex-wrap gap-4">
+        <div>
+          <div class="eyebrow">Revenue</div>
+          <h1 class="h1">Billing + payments</h1>
+          <p class="text-sm mt-3" style="color:var(--ink-muted)">Create safer invoices, keep payment instructions clear, and move drafts to sent or paid with explicit confirmation.</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <a class="btn" href="#/settings">${I.wallet}<span>Settings</span></a>
+          <button class="btn btn-primary" id="new-invoice-btn">${I.plus}<span>New invoice</span></button>
+        </div>
+      </header>
+
+      ${!me.wallet_address ? `<section class="card p-5">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div class="font-medium">Add a wallet address before sending invoices</div>
+            <div class="text-sm mt-1" style="color:var(--ink-muted)">On-chain invoices need a Base wallet address so clients know where to pay.</div>
+          </div>
+          <a class="btn" href="#/settings">${I.wallet}<span>Open settings</span></a>
+        </div>
+      </section>` : ''}
+
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        ${UI.statCard('Total invoiced', U.fmtMoney(allTotal, 'USD'), `${invoices.length} invoice${invoices.length === 1 ? '' : 's'}`)}
+        ${UI.statCard('Collected', U.fmtMoney(paidTotal, 'USD'), `${invoices.filter(i => i.status === 'paid').length} paid`)}
+        ${UI.statCard('Pending', U.fmtMoney(sentTotal, 'USD'), `${invoices.filter(i => i.status === 'sent').length} sent`)}
+        ${UI.statCard('Drafts', U.fmtMoney(draftTotal, 'USD'), `${invoices.filter(i => i.status === 'draft').length} draft${invoices.filter(i => i.status === 'draft').length === 1 ? '' : 's'}`)}
+      </section>
+
+      <section class="card p-6 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div class="eyebrow">Invoices</div>
+            <h2 class="h2">All invoices</h2>
+            <div class="text-sm mt-1" style="color:var(--ink-muted)">Drafts stay internal until you mark them sent. Paid invoices remain here as your billing history.</div>
+          </div>
+          <button class="btn" id="new-invoice-btn-2">${I.plus}<span>New invoice</span></button>
+        </div>
+        ${invoices.length ? `
+          <div class="divide-hair">
+            ${invoices.map(inv => {
+              const project = Projects.byId(inv.project_id);
+              const client = Clients.byId(inv.client_id);
+              const statusTone = invoiceStatusTone(inv);
+              return `
+                <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <div class="font-medium text-xs font-mono">${U.esc(inv.id)}</div>
+                      ${UI.statusChip(statusTone)}
+                      <span class="text-xs" style="color:var(--ink-faint)">Issued ${U.fmtDay(inv.issued_at)}</span>
+                    </div>
+                    <div class="text-sm mt-2" style="color:var(--ink-muted)">${U.esc(client?.name || '—')} · ${U.esc(project?.name || 'No project')}</div>
+                    <div class="text-xs mt-1" style="color:var(--ink-faint)">${inv.line_items.length} line item${inv.line_items.length === 1 ? '' : 's'} · Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '—')}</div>
+                    <div class="text-xs mt-1" style="color:${statusTone === 'overdue' ? 'var(--danger)' : 'var(--ink-muted)'}">${U.esc(invoiceStatusNote(inv))}</div>
+                    <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
+                  </div>
+                  <div class="text-right min-w-[240px]">
+                    <div class="font-mono text-lg">${U.fmtMoney(inv.amount, inv.currency || 'USD')}</div>
+                    <div class="flex gap-2 flex-wrap justify-end mt-3">
+                      ${renderInvoicePrimaryAction(inv)}
+                      ${inv.payment_address ? `<button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.payment_address)}">${I.copy}<span>Copy address</span></button>` : ''}
+                      ${inv.status === 'draft' ? `<button class="btn btn-ghost text-xs" data-inv-delete="${inv.id}" style="color:var(--danger)">Delete draft</button>` : ''}
+                    </div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+        ` : invoiceEmptyState}
+      </section>
+
+      <section class="card p-6 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div class="eyebrow">Payout runs</div>
+            <h2 class="h2">Track outgoing payments</h2>
+            <div class="text-sm mt-1" style="color:var(--ink-muted)">Log batched payouts to workers or vendors. Move each run from draft → queued → completed.</div>
+          </div>
+          <button class="btn" id="new-payout-btn">${I.plus}<span>New run</span></button>
+        </div>
+        ${payoutRuns.length ? `<div class="divide-hair">` + payoutRuns.map(run => {
+          const statusNote = run.status === 'draft' ? 'Not queued yet — review before sending.'
+            : run.status === 'queued' ? `Queued${run.queued_at ? ' on ' + U.fmtDay(run.queued_at) : ''} — waiting for settlement.`
+            : run.status === 'completed' ? `Completed${run.completed_at ? ' on ' + U.fmtDay(run.completed_at) : ''}.`
+            : '';
+          const primaryAction = run.status === 'draft'
+            ? `<button class="btn btn-primary text-xs" data-payout-status="${run.id}" data-next="queued">${I.export}<span>Queue for payout</span></button>`
+            : run.status === 'queued'
+              ? `<button class="btn btn-primary text-xs" data-payout-status="${run.id}" data-next="completed">${I.check}<span>Mark completed</span></button>`
+              : `<span class="text-xs" style="color:var(--ink-muted)">${U.esc(statusNote)}</span>`;
+          return `
+          <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <div class="font-medium text-xs font-mono">${U.esc(run.id)}</div>
+                ${UI.statusChip(run.status)}
+                <span class="text-xs" style="color:var(--ink-faint)">Created ${U.fmtDay(run.created_at)}</span>
+              </div>
+              <div class="text-sm mt-2" style="color:var(--ink-muted)">${U.esc(run.provider || 'Manual')} · ${U.fmtMoney(run.amount, run.currency || 'USD')} · ${(run.line_items || []).length} item${(run.line_items || []).length === 1 ? '' : 's'}</div>
+              <div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(statusNote)}</div>
+            </div>
+            <div class="text-right min-w-[200px]">
+              <div class="font-mono text-lg">${U.fmtMoney(run.amount, run.currency || 'USD')}</div>
+              <div class="flex gap-2 flex-wrap justify-end mt-3">
+                ${primaryAction}
+              </div>
+            </div>
+          </div>`;
+        }).join('') + `</div>` : UI.emptyState(I.money, 'No payout runs yet', 'Use payout runs to log batched payments to workers or vendors. Each run tracks provider, amount, and settlement status.', `<button class="btn btn-primary" id="new-payout-empty">${I.plus}<span>Create first run</span></button>`)}
+      </section>
+    </div>
+  `;
+};
+
+function openNewInvoiceModal(prefill = {}) {
+  const projects = Projects.all();
+  const clients = Clients.all();
+  const operator = Users.auth();
+  const defaults = Store.state.meta || {};
+  const defaultWallet = operator?.wallet_address || '';
+  const defaultCurrency = defaults.default_billing_currency || CONFIG.defaultCurrency || 'USD';
+  const defaultProvider = defaults.default_billing_rail || 'USDC (Base)';
+  const defaultDueDays = Number(defaults.default_due_days || 14);
+  const prefillProject = prefill.projectId ? Projects.byId(prefill.projectId) : null;
+  const inferredClientId = prefill.clientId || prefillProject?.client_id || (clients.length === 1 ? clients[0].id : '');
+  const inferredProjectId = prefill.projectId || '';
+
+  if (!clients.length) {
+    Modal.open('Create invoice', h`
+      <div class="space-y-4">
+        <div class="card-flat p-4">
+          <div class="font-medium">Add a client before you invoice</div>
+          <div class="text-sm mt-1" style="color:var(--ink-muted)">Invoices need a client record first so payment details, history, and portal access stay attached to the right company.</div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" data-close>Cancel</button>
+          <a class="btn btn-primary" href="#/clients" data-close>${I.plus}<span>Go to clients</span></a>
+        </div>
+      </div>
+    `);
+    return;
+  }
+
+  Modal.open('Create invoice', h`
+    <form id="modal-form" class="space-y-4">
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="lbl">Client</label>
+          <select class="field" name="client_id" id="inv-client">
+            <option value="">Select client…</option>
+            ${clients.map(c => `<option value="${c.id}" ${c.id === inferredClientId ? 'selected' : ''}>${U.esc(c.name)}</option>`).join('')}
+          </select>
+          <div class="text-xs mt-1" style="color:var(--ink-muted)">Pick a client first, or choose a project and we’ll match the client for you.</div>
+        </div>
+        <div>
+          <label class="lbl">Project</label>
+          <select class="field" name="project_id" id="inv-project">
+            <option value="">Select project…</option>
+            ${projects.map(p => `<option value="${p.id}" data-client="${p.client_id}" ${p.id === inferredProjectId ? 'selected' : ''}>${U.esc(p.name)}</option>`).join('')}
+          </select>
+          <div class="text-xs mt-1" id="project-help" style="color:var(--ink-muted)">Optional, but useful for portal history and shared updates.</div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="lbl">Payment rail</label>
+          <select class="field" name="provider" id="inv-provider">
+            ${CONFIG.paymentRails.billing.map(r => `<option value="${r}" ${r === defaultProvider ? 'selected' : ''}>${r}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Currency</label>
+          <select class="field" name="currency">
+            ${CONFIG.currencies.map(c => `<option value="${c.code}" ${c.code === defaultCurrency ? 'selected' : ''}>${c.code} — ${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Due days</label>
+          <input class="field" name="due_days" type="number" min="1" max="90" value="${defaultDueDays}" />
+        </div>
+      </div>
+
+      <div>
+        <label class="lbl" id="payment-address-label">Payment address</label>
+        <input class="field font-mono" name="payment_address" id="payment-address-field" placeholder="0x…" value="${U.esc(defaultWallet)}" />
+        <div class="text-xs mt-1" id="payment-address-help" style="color:var(--ink-muted)">For on-chain rails, enter a Base wallet address. For manual, describe how your client should pay.</div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="lbl" style="margin-bottom:0">Line items</label>
+          <button type="button" class="btn btn-ghost text-xs" id="add-line-item">${I.plus} Add line</button>
+        </div>
+        <div id="line-items-list" class="space-y-2">
+          <div class="card-flat p-3 grid grid-cols-[1fr_80px_80px_100px] gap-2 items-end" data-li="0">
+            <div><label class="lbl">Description</label><input class="field" name="li_desc_0" placeholder="Design work" /></div>
+            <div><label class="lbl">Qty</label><input class="field" name="li_qty_0" type="number" value="1" min="0" step="1" /></div>
+            <div><label class="lbl">Rate</label><input class="field" name="li_rate_0" type="number" value="0" min="0" step="0.01" /></div>
+            <div><label class="lbl">Amount</label><input class="field font-mono" name="li_amount_0" type="number" value="0" min="0" step="0.01" /></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-flat p-4 flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div class="text-xs uppercase tracking-wider" style="color:var(--ink-faint)">Invoice total</div>
+          <div class="font-display text-3xl" id="invoice-total">${U.fmtMoney(0, defaultCurrency)}</div>
+        </div>
+        <div class="text-sm" style="color:var(--ink-muted)">Drafts stay internal until you mark them sent.</div>
+      </div>
+
+      <div>
+        <label class="lbl">Notes</label>
+        <textarea class="field" name="notes" placeholder="Any extra context…"></textarea>
+      </div>
+
+      <div id="invoice-status" class="text-sm" aria-live="polite" style="color:var(--ink-muted)"></div>
+      <div id="invoice-error" class="text-sm" role="alert" aria-live="polite" style="color:var(--danger)"></div>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="invoice-submit">Create draft invoice</button>
+      </div>
+    </form>
+  `, {
+    onMount: (root) => {
+      let liCount = 1;
+      let isSubmitting = false;
+      const formEl = root.querySelector('#modal-form');
+      const clientEl = root.querySelector('#inv-client');
+      const projectEl = root.querySelector('#inv-project');
+      const providerEl = root.querySelector('#inv-provider');
+      const totalEl = root.querySelector('#invoice-total');
+      const errorEl = root.querySelector('#invoice-error');
+      const statusEl = root.querySelector('#invoice-status');
+      const currencyEl = root.querySelector('[name="currency"]');
+      const labelEl = root.querySelector('#payment-address-label');
+      const paymentHelpEl = root.querySelector('#payment-address-help');
+      const paymentField = root.querySelector('#payment-address-field');
+      const projectHelpEl = root.querySelector('#project-help');
+      const submitBtn = root.querySelector('#invoice-submit');
+
+      const getProjectOptions = () => Array.from(projectEl.querySelectorAll('option[data-client]'));
+      const visibleProjectOptions = () => getProjectOptions().filter(opt => !opt.hidden && !opt.disabled);
+      const selectedProjectOption = () => projectEl.selectedOptions[0]?.dataset.client ? projectEl.selectedOptions[0] : null;
+
+      const updatePaymentLabel = () => {
+        if (isOnChainRail(providerEl.value)) {
+          const tokenName = providerEl.value.startsWith('USDT') ? 'USDT' : 'USDC';
+          labelEl.textContent = `${tokenName} wallet address (Base)`;
+          paymentField.placeholder = '0x…';
+          paymentHelpEl.textContent = `Enter the Base wallet address where you want to receive ${tokenName}.`;
+        } else {
+          labelEl.textContent = 'Payment instructions';
+          paymentField.placeholder = 'Reference, notes, or instructions for your client';
+          paymentHelpEl.textContent = 'Describe how your client should pay — e.g. bank details, invoice reference, or a link.';
+        }
+      };
+
+      const updateProjectOptions = () => {
+        const cid = clientEl.value;
+        getProjectOptions().forEach(opt => {
+          const visible = !cid || opt.dataset.client === cid;
+          opt.hidden = !visible;
+          opt.disabled = !visible;
+        });
+        const selected = selectedProjectOption();
+        if (selected && cid && selected.dataset.client !== cid) projectEl.value = '';
+        const visible = visibleProjectOptions();
+        if (!projectEl.value && cid && visible.length === 1) projectEl.value = visible[0].value;
+        projectHelpEl.textContent = visible.length
+          ? 'Optional, but useful for portal history and shared updates.'
+          : cid
+            ? 'No projects yet for this client. You can still create a client-level invoice.'
+            : 'Optional, but useful for portal history and shared updates.';
+      };
+
+      const calculateTotal = () => {
+        let total = 0;
+        for (let i = 0; i < liCount; i++) total += Number(root.querySelector(`[name="li_amount_${i}"]`)?.value || 0);
+        totalEl.textContent = U.fmtMoney(total, currencyEl.value || 'USD');
+        return total;
+      };
+
+      const collectLineItems = () => {
+        const fd = new FormData(formEl);
+        const lineItems = [];
+        for (let i = 0; i < liCount; i++) {
+          const desc = String(fd.get(`li_desc_${i}`) || '').trim();
+          const amount = Number(fd.get(`li_amount_${i}`)) || 0;
+          if (!desc && amount <= 0) continue;
+          lineItems.push({
+            description: desc,
+            quantity: Number(fd.get(`li_qty_${i}`)) || 1,
+            rate: Number(fd.get(`li_rate_${i}`)) || 0,
+            amount,
+          });
+        }
+        return lineItems;
+      };
+
+      const updateFormState = () => {
+        const total = calculateTotal();
+        const lineItems = collectLineItems();
+        const hasSelection = Boolean(clientEl.value || projectEl.value);
+        const hasPositiveLine = lineItems.some(li => String(li.description || '').trim() && Number(li.amount || 0) > 0);
+        const needsWallet = isOnChainRail(providerEl.value);
+        const hasPaymentAddress = Boolean(String(paymentField.value || '').trim());
+        let status = '';
+        if (!hasSelection) status = 'Choose a client or project to attach this invoice.';
+        else if (!hasPositiveLine || total <= 0) status = 'Add at least one line item with a description and non-zero amount.';
+        else if (needsWallet && !hasPaymentAddress) status = 'Add a Base wallet address before creating this invoice.';
+        else status = projectEl.value ? 'Ready to save as a draft invoice for this project.' : 'Ready to save as a draft invoice for this client.';
+        statusEl.textContent = status;
+        statusEl.style.color = (!hasSelection || !hasPositiveLine || total <= 0 || (needsWallet && !hasPaymentAddress)) ? 'var(--ink-muted)' : 'var(--brand)';
+        submitBtn.disabled = isSubmitting || !hasSelection || !hasPositiveLine || total <= 0 || (needsWallet && !hasPaymentAddress);
+        submitBtn.textContent = isSubmitting ? 'Creating…' : 'Create draft invoice';
+      };
+
+      const syncClientFromProject = () => {
+        const opt = selectedProjectOption();
+        if (opt?.dataset.client && clientEl.value !== opt.dataset.client) clientEl.value = opt.dataset.client;
+        updateProjectOptions();
+      };
+
+      const calcAmount = (idx) => {
+        const qty = Number(root.querySelector(`[name="li_qty_${idx}"]`)?.value || 0);
+        const rate = Number(root.querySelector(`[name="li_rate_${idx}"]`)?.value || 0);
+        const amountField = root.querySelector(`[name="li_amount_${idx}"]`);
+        if (amountField) amountField.value = (qty * rate).toFixed(2);
+        updateFormState();
+      };
+
+      const bindLine = (idx) => {
+        root.querySelector(`[name="li_desc_${idx}"]`)?.addEventListener('input', updateFormState);
+        root.querySelector(`[name="li_qty_${idx}"]`)?.addEventListener('input', () => calcAmount(idx));
+        root.querySelector(`[name="li_rate_${idx}"]`)?.addEventListener('input', () => calcAmount(idx));
+        root.querySelector(`[name="li_amount_${idx}"]`)?.addEventListener('input', updateFormState);
+      };
+
+      bindLine(0);
+      clientEl?.addEventListener('change', () => {
+        errorEl.textContent = '';
+        updateProjectOptions();
+        updateFormState();
+      });
+      projectEl?.addEventListener('change', () => {
+        errorEl.textContent = '';
+        syncClientFromProject();
+        updateFormState();
+      });
+      currencyEl?.addEventListener('change', updateFormState);
+      providerEl?.addEventListener('change', () => {
+        updatePaymentLabel();
+        updateFormState();
+      });
+      paymentField?.addEventListener('input', updateFormState);
+      updatePaymentLabel();
+      syncClientFromProject();
+      updateProjectOptions();
+
+      root.querySelector('#add-line-item').addEventListener('click', () => {
+        const idx = liCount++;
+        root.querySelector('#line-items-list').insertAdjacentHTML('beforeend', `
+          <div class="card-flat p-3 grid grid-cols-[1fr_80px_80px_100px] gap-2 items-end" data-li="${idx}">
+            <div><input class="field" name="li_desc_${idx}" placeholder="Line item" /></div>
+            <div><input class="field" name="li_qty_${idx}" type="number" value="1" min="0" step="1" /></div>
+            <div><input class="field" name="li_rate_${idx}" type="number" value="0" min="0" step="0.01" /></div>
+            <div><input class="field font-mono" name="li_amount_${idx}" type="number" value="0" min="0" step="0.01" /></div>
+          </div>`);
+        bindLine(idx);
+        updateFormState();
+      });
+
+      const handleSubmit = async () => {
+        errorEl.textContent = '';
+        updateFormState();
+        if (submitBtn.disabled) return;
+        const fd = new FormData(formEl);
+        const lineItems = collectLineItems();
+        isSubmitting = true;
+        updateFormState();
+        try {
+          await Revenue.createInvoice({
+            projectId: fd.get('project_id') || null,
+            clientId: fd.get('client_id') || null,
+            lineItems,
+            currency: fd.get('currency') || 'USD',
+            provider: fd.get('provider') || 'USDC (Base)',
+            notes: fd.get('notes'),
+            dueDays: Number(fd.get('due_days')) || defaultDueDays,
+            paymentAddress: fd.get('payment_address'),
+          });
+          Modal.close();
+          Toast.show('Invoice created');
+          await router.render();
+        } catch (err) {
+          errorEl.textContent = err.message || String(err);
+        } finally {
+          isSubmitting = false;
+          updateFormState();
+        }
+      };
+
+      formEl.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await handleSubmit();
+      });
+      updateFormState();
+    }
+  });
+}
+
+function openNewPayoutModal() {
+  Modal.open('Create payout run', h`
+    <form id="modal-form" class="space-y-4">
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="lbl">Provider</label>
+          <select class="field" name="provider">
+            ${CONFIG.paymentRails.payouts.map(r => `<option value="${r}">${r}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Currency</label>
+          <select class="field" name="currency">
+            ${CONFIG.currencies.map(c => `<option value="${c.code}">${c.code}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="lbl" style="margin-bottom:0">Line items</label>
+          <button type="button" class="btn btn-ghost text-xs" id="add-payout-line">${I.plus} Add</button>
+        </div>
+        <div id="payout-lines" class="space-y-2">
+          <div class="card-flat p-3 grid grid-cols-[1fr_120px] gap-2">
+            <input class="field" name="pl_desc_0" placeholder="Description" />
+            <input class="field" name="pl_amount_0" type="number" placeholder="Amount" value="0" min="0" step="0.01" />
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create run</button>
+      </div>
+    </form>
+  `, {
+    onMount: (root) => {
+      let plCount = 1;
+      root.querySelector('#add-payout-line').addEventListener('click', () => {
+        const idx = plCount++;
+        root.querySelector('#payout-lines').insertAdjacentHTML('beforeend', `
+          <div class="card-flat p-3 grid grid-cols-[1fr_120px] gap-2">
+            <input class="field" name="pl_desc_${idx}" placeholder="Description" />
+            <input class="field" name="pl_amount_${idx}" type="number" placeholder="Amount" value="0" min="0" step="0.01" />
+          </div>`);
+      });
+      root.querySelector('#modal-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const lineItems = [];
+        for (let i = 0; i < plCount; i++) {
+          const desc = fd.get(`pl_desc_${i}`);
+          if (!desc) continue;
+          lineItems.push({ description: desc, amount: Number(fd.get(`pl_amount_${i}`)) || 0 });
+        }
+        try {
+          await Revenue.createPayoutRun({
+            lineItems,
+            currency: fd.get('currency') || 'USD',
+            provider: fd.get('provider') || 'USDC (Base)',
+          });
+          Modal.close();
+          Toast.show('Payout run created');
+          await router.render();
+        } catch (err) { Toast.show(err.message, 'err'); }
+      });
+    }
+  });
+}
+
+Pages.billing.mount = () => {
+  bindOperatorWorkspaceActions();
+  const openNew = () => openNewInvoiceModal();
+  document.getElementById('new-invoice-btn')?.addEventListener('click', openNew);
+  document.getElementById('new-invoice-btn-2')?.addEventListener('click', openNew);
+  document.getElementById('new-invoice-btn-empty')?.addEventListener('click', openNew);
+  document.getElementById('new-payout-btn')?.addEventListener('click', () => openNewPayoutModal());
+  document.getElementById('new-payout-empty')?.addEventListener('click', () => openNewPayoutModal());
+
+  document.querySelectorAll('[data-inv-status]').forEach(btn => btn.addEventListener('click', async () => {
+    const next = btn.dataset.next;
+    if (next === 'paid' && !confirm('Record payment for this invoice and mark it paid?')) return;
+    if (next === 'sent' && !confirm('Mark this draft invoice as sent? It will become visible in client-facing views.')) return;
+    await Revenue.setInvoiceStatus(btn.dataset.invStatus, next);
+    Toast.show(next === 'paid' ? 'Invoice marked paid' : 'Invoice marked sent');
+    await router.render();
+  }));
+  document.querySelectorAll('[data-inv-delete]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Delete this draft invoice? This cannot be undone.')) return;
+    await Revenue.deleteInvoice(btn.dataset.invDelete);
+    Toast.show('Draft invoice deleted');
+    await router.render();
+  }));
+  document.querySelectorAll('[data-payout-status]').forEach(btn => btn.addEventListener('click', async () => {
+    const next = btn.dataset.next;
+    if (next === 'queued' && !confirm('Queue this payout run for settlement? You can still mark it completed later.')) return;
+    if (next === 'completed' && !confirm('Mark this payout run as completed? This records it as fully settled.')) return;
+    await Revenue.setPayoutStatus(btn.dataset.payoutStatus, next);
+    Toast.show(next === 'completed' ? 'Payout run completed' : 'Payout run queued');
+    await router.render();
+  }));
+};
+
+/* ─────────── CLIENT PORTAL (authenticated) ─────────── */
+Pages.portal = async () => {
+  const me = Users.current();
+  if (!me || me.role !== 'client') {
+    return `<div class="max-w-4xl mx-auto p-6 md:p-10 anim-in">${UI.emptyState(I.export, 'Client access only', 'Sign in with a client account to view your project portal.')}</div>`;
+  }
+  const projects = Projects.forCurrentClient();
+  const invoices = Revenue.visibleToClient(me.client_id);
+  const client = Clients.byId(me.client_id);
+  const paidTotal = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.amount || 0), 0);
+  const outstandingInvoices = invoices.filter(i => i.status === 'sent');
+  const outstandingTotal = outstandingInvoices.reduce((s, i) => s + Number(i.amount || 0), 0);
+
+  return h`
+    <div class="p-6 md:p-10 space-y-8 anim-in">
+      <header class="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <div class="eyebrow">Client portal</div>
+          <h1 class="h1">${U.esc(client?.name || me.name)}</h1>
+          <p class="text-sm mt-2 max-w-2xl" style="color:var(--ink-muted)">Track project progress, review deliverables, and handle invoices with clear payment details.</p>
+        </div>
+      </header>
+
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        ${UI.statCard('Projects', U.fmtNum(projects.length))}
+        ${UI.statCard('Total paid', U.fmtMoney(paidTotal, 'USD'))}
+        ${UI.statCard('Outstanding', U.fmtMoney(outstandingTotal, 'USD'), `${outstandingInvoices.length} pending`)}
+        ${UI.statCard('Invoices', U.fmtNum(invoices.length))}
+      </section>
+
+      ${outstandingInvoices.length ? `<section class="card p-6">
+        <div class="eyebrow">Payment due</div>
+        <h2 class="h2 mt-1">Outstanding invoices</h2>
+        <div class="divide-hair mt-4">
+          ${outstandingInvoices.map(inv => `
+            <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
+              <div class="min-w-0 flex-1">
+                <div class="font-medium">${U.esc(Projects.byId(inv.project_id)?.name || 'Project invoice')}</div>
+                <div class="text-xs mt-1" style="color:var(--ink-muted)">Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '—')} · ${inv.line_items.length} line item${inv.line_items.length === 1 ? '' : 's'}</div>
+                <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
+              </div>
+              <div class="text-right min-w-[180px]">
+                <div class="font-mono text-lg">${U.fmtMoney(inv.amount, inv.currency || 'USD')}</div>
+                <button class="btn btn-ghost mt-3" data-copy="${U.esc(inv.amount)} ${U.esc(inv.currency || 'USD')}">${I.copy}<span>Copy amount</span></button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </section>` : `<section class="card p-6"><div class="font-medium">You’re all caught up.</div><div class="text-sm mt-1" style="color:var(--ink-muted)">There are no outstanding invoices right now.</div></section>`}
+
+      ${projects.map(project => {
+        const deliverables = project.deliverables || [];
+        const delivered = deliverables.filter(d => d.status === 'delivered').length;
+        const total = deliverables.length;
+        const pct = total ? Math.round((delivered / total) * 100) : 0;
+        return `
+          <section class="card p-6">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="h2">${U.esc(project.name)}</h2>
+                  ${UI.statusChip(project.status)}
+                </div>
+                <div class="text-sm mt-1" style="color:var(--ink-muted)">${U.esc(project.description || '')}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-display">${pct}%</div>
+                <div class="text-xs" style="color:var(--ink-muted)">${delivered}/${total} delivered</div>
+              </div>
+            </div>
+            <div class="h-2 rounded-full mb-4" style="background:var(--bg-sunken)">
+              <div class="bar h-2 rounded-full" style="width:${pct}%; background:var(--brand)"></div>
+            </div>
+            ${deliverables.length ? `<div class="divide-hair">` + deliverables.map(d => `
+              <div class="py-3 flex items-center justify-between gap-3">
+                <div>
+                  <div class="font-medium">${U.esc(d.name)}</div>
+                  ${d.note ? `<div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(d.note)}</div>` : ''}
+                </div>
+                ${UI.statusChip(d.status)}
+              </div>
+            `).join('') + `</div>` : `<div class="text-sm" style="color:var(--ink-muted)">No deliverables tracked yet.</div>`}
+          </section>`;
+      }).join('')}
+
+      <section class="card p-6">
+        <div class="eyebrow">Invoices</div>
+        <h2 class="h2 mb-4">Billing history</h2>
+        ${invoices.length ? `<div class="divide-hair">` + invoices.map(inv => {
+          const project = Projects.byId(inv.project_id);
+          return `
+            <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
+              <div class="min-w-0 flex-1">
+                <div class="font-medium">${U.esc(project?.name || '—')}</div>
+                <div class="text-xs mt-1" style="color:var(--ink-muted)">${U.fmtDay(inv.issued_at)} · ${inv.line_items.length} line item${inv.line_items.length === 1 ? '' : 's'}</div>
+                <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
+              </div>
+              <div class="text-right min-w-[180px]">
+                <div class="font-mono">${U.fmtMoney(inv.amount, inv.currency || 'USD')}</div>
+                ${UI.statusChip(inv.status)}
+              </div>
+            </div>`;
+        }).join('') + `</div>` : `<div class="text-sm" style="color:var(--ink-muted)">No invoices yet.</div>`}
+      </section>
+    </div>
+  `;
+};
+
+Pages.portal.mount = () => {
+  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    await U.copyToClipboard(btn.dataset.copy);
+    Toast.show('Copied');
+  }));
+};
+
+/* ─────────── PUBLIC SHARE (project portal link) ─────────── */
+Pages.share = async () => {
+  const params = U.hashParams();
+  const token = params.token || '';
+  const project = token ? Projects.portalByToken(token) : null;
+
+  if (!project) {
+    return h`
+      <div class="max-w-4xl mx-auto p-6 md:p-10 anim-in">
+        ${UI.emptyState(I.link, 'Project not found', 'This portal link is invalid or has expired. Ask the freelancer to share a new link.', `<a class="btn" href="${U.href('#/landing', { demo: APP.demo })}">Back to home</a>`)}
+      </div>
+    `;
+  }
+
+  const client = Clients.byId(project.client_id);
+  const deliverables = project.deliverables || [];
+  const delivered = deliverables.filter(d => d.status === 'delivered').length;
+  const total = deliverables.length;
+  const pct = total ? Math.round((delivered / total) * 100) : 0;
+  const invoices = Revenue.visibleForProjectShare(project.id);
+  const paidTotal = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.amount || 0), 0);
+  const outstandingInvoices = invoices.filter(i => i.status === 'sent');
+  const outstandingTotal = outstandingInvoices.reduce((s, i) => s + Number(i.amount || 0), 0);
+
+  return h`
+    <div class="p-6 md:p-10 space-y-8 anim-in">
+      <header>
+        <div class="flex items-center gap-2 mb-2 flex-wrap">
+          <span class="chip chip-indigo"><span class="chip-dot"></span>Shared portal</span>
+          ${UI.statusChip(project.status)}
+        </div>
+        <h1 class="h1">${U.esc(project.name)}</h1>
+        <p class="text-sm mt-2" style="color:var(--ink-muted)">${U.esc(project.description || '')}</p>
+        ${client ? `<div class="text-xs mt-2" style="color:var(--ink-faint)">Client: ${U.esc(client.name)}</div>` : ''}
+      </header>
+
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        ${UI.statCard('Progress', `${pct}%`, `${delivered}/${total} delivered`)}
+        ${UI.statCard('Total paid', U.fmtMoney(paidTotal, 'USD'))}
+        ${UI.statCard('Outstanding', U.fmtMoney(outstandingTotal, 'USD'), `${outstandingInvoices.length} invoice${outstandingInvoices.length === 1 ? '' : 's'}`)}
+        ${UI.statCard('Invoices', U.fmtNum(invoices.length))}
+      </section>
+
+      ${outstandingInvoices.length ? `<section class="card p-6">
+        <div class="eyebrow">Payment</div>
+        <h2 class="h2 mt-1">Outstanding invoices</h2>
+        <div class="divide-hair mt-4">
+          ${outstandingInvoices.map(inv => {
+            const token = inv.token || 'USDC';
+            const isOnChain = isOnChainRail(inv.provider) && inv.payment_address;
+            const payLink = isOnChain ? Crypto.paymentLink(inv.payment_address, Number(inv.amount), token) : '';
+            const hasWallet = Crypto.hasWallet();
+            return `
+            <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="font-medium">Invoice issued ${U.fmtDay(inv.issued_at)}</div>
+                  ${invoiceIsOverdue(inv) ? UI.statusChip('overdue') : ''}
+                </div>
+                <div class="text-xs mt-1" style="color:var(--ink-muted)">${inv.line_items.length} item${inv.line_items.length === 1 ? '' : 's'} · Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '—')}</div>
+                ${inv.line_items.map(li => `<div class="text-xs mt-1" style="color:var(--ink-faint)">• ${U.esc(li.description || '—')} — ${U.fmtMoney(li.amount || 0, inv.currency || 'USD')}</div>`).join('')}
+                <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
+              </div>
+              <div class="text-right min-w-[200px]">
+                <div class="font-mono text-lg">${U.fmtMoney(inv.amount, inv.currency || 'USD')}</div>
+                <div class="flex flex-col gap-2 mt-3 items-end">
+                  ${isOnChain && hasWallet ? `
+                    <button class="btn btn-primary text-xs pay-now-btn" data-amount="${inv.amount}" data-token="${token}" data-to="${U.esc(inv.payment_address)}" data-invoice-id="${inv.id}">
+                      ${I.wallet}<span>Pay ${Crypto.formatAmount(inv.amount, token)}</span>
+                    </button>
+                  ` : ''}
+                  ${isOnChain ? `
+                    <a href="${U.esc(payLink)}" class="btn ${hasWallet ? 'btn-ghost' : 'btn-primary'} text-xs" target="_blank" rel="noopener">${I.wallet}<span>Open in wallet app</span></a>
+                  ` : ''}
+                  <button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.amount)} ${U.esc(inv.currency || 'USD')}">${I.copy}<span>Copy amount</span></button>
+                </div>
+                <div class="pay-status hidden card-flat p-3 mt-3 text-left text-xs" data-pay-status="${inv.id}"></div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </section>` : ''}
+
+      <section class="card p-6">
+        <div class="eyebrow">Deliverables</div>
+        <h2 class="h2 mb-4">Project progress</h2>
+        <div class="h-3 rounded-full mb-6" style="background:var(--bg-sunken)">
+          <div class="bar h-3 rounded-full" style="width:${pct}%; background: linear-gradient(90deg, var(--brand), #6366f1)"></div>
+        </div>
+        ${deliverables.length ? `<div class="divide-hair">` + deliverables.map(d => `
+          <div class="py-3 flex items-center justify-between gap-3">
+            <div class="flex items-start gap-3">
+              <div class="mt-1">${d.status === 'delivered' ? `<div style="color:#1f5d23">${I.check}</div>` : d.status === 'in_progress' ? `<div style="color:var(--brand)">${I.chart}</div>` : `<div style="color:var(--ink-faint)">${I.file}</div>`}</div>
+              <div>
+                <div class="font-medium">${U.esc(d.name)}</div>
+                ${d.note ? `<div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(d.note)}</div>` : ''}
+              </div>
+            </div>
+            ${UI.statusChip(d.status)}
+          </div>
+        `).join('') + `</div>` : `<div class="text-sm" style="color:var(--ink-muted)">No deliverables tracked yet.</div>`}
+      </section>
+
+      ${invoices.length ? `
+        <section class="card p-6">
+          <div class="eyebrow">Billing history</div>
+          <h2 class="h2 mb-4">Visible invoices</h2>
+          <div class="divide-hair">
+            ${invoices.map(inv => `
+              <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
+                <div class="min-w-0 flex-1">
+                  <div class="font-medium">${U.fmtDay(inv.issued_at)}</div>
+                  <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-mono text-lg">${U.fmtMoney(inv.amount, inv.currency || 'USD')}</div>
+                  ${UI.statusChip(inv.status)}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+      ` : `<section class="card p-6"><div class="text-sm" style="color:var(--ink-muted)">No invoice has been shared on this project yet.</div></section>`}
+
+      <section class="text-center py-2">
+        <div class="text-xs" style="color:var(--ink-faint)">This is a shared project view. Need your full client portal? <a href="${U.href(U.setHashParams('#/login', { intent: 'client', tab: 'signin', reason: 'client', redirect: '#/portal' }), { demo: APP.demo })}" style="color:var(--brand)">Sign in</a>.</div>
+      </section>
+    </div>
+  `;
+};
+
+Pages.share.mount = () => {
+  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    await U.copyToClipboard(btn.dataset.copy);
+    Toast.show('Copied');
+  }));
+
+  // Wire "Pay with wallet" buttons on outstanding invoices
+  document.querySelectorAll('.pay-now-btn').forEach(btn => btn.addEventListener('click', async () => {
+    const amount = Number(btn.dataset.amount);
+    const token = btn.dataset.token;
+    const to = btn.dataset.to;
+    const invoiceId = btn.dataset.invoiceId;
+    const statusEl = document.querySelector(`[data-pay-status="${invoiceId}"]`);
+    const showStatus = (msg, color = 'var(--ink-muted)') => {
+      if (!statusEl) return;
+      statusEl.classList.remove('hidden');
+      statusEl.innerHTML = `<div style="color:${color}">${msg}</div>`;
+    };
+
+    btn.disabled = true;
+    const origText = btn.innerHTML;
+    btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Connecting…</span>`;
+    showStatus('Connecting to wallet…');
+
+    try {
+      if (!Crypto.isConnected()) await Crypto.connect();
+      btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Approve in wallet…</span>`;
+      showStatus('Approve the transaction in your wallet…');
+
+      const hash = await Crypto.sendPayment(to, amount, token);
+      btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Confirming…</span>`;
+      showStatus(`Transaction sent. Waiting for confirmation…<br/><a href="${Crypto.txUrl(hash)}" target="_blank" class="underline" style="color:var(--brand)">View on BaseScan →</a>`);
+
+      const receipt = await Crypto.waitForTx(hash);
+      if (receipt.status === 'success') {
+        showStatus(`✓ Payment confirmed!<br/><a href="${Crypto.txUrl(hash)}" target="_blank" class="underline" style="color:var(--brand)">View on BaseScan →</a>`, 'var(--brand)');
+        btn.innerHTML = `${I.check}<span>Paid</span>`;
+        btn.classList.remove('btn-primary'); btn.classList.add('btn');
+        // Mark invoice as paid in local DB if possible
+        try {
+          await Revenue.setInvoiceStatus(invoiceId, 'paid', { provider: `${token} (Base)`, external_ref: hash });
+        } catch { /* share page may not have write access */ }
+      } else {
+        throw new Error('Transaction reverted on-chain');
+      }
+    } catch (e) {
+      showStatus(`Payment failed: ${U.esc(e.message || String(e))}`, 'var(--danger)');
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+  }));
+};
+
+/* ══════════════════════════════════════ 13. ROUTER + SHELL ══════════════════════════════════════ */
+
+const ROUTES = [
+  { path: '#/landing',  page: 'landing',   label: 'Home',      icon: I.dash,   public: true,  nav: false },
+  { path: '#/login',    page: 'login',     label: 'Login',     icon: I.user,   public: true,  nav: false },
+  { path: '#/',         page: 'dashboard', label: 'Dashboard', icon: I.dash,   roles: ['operator'] },
+  { path: '#/clients',  page: 'clients',   label: 'Clients',   icon: I.users,  roles: ['operator'] },
+  { path: '#/projects', page: 'projects',  label: 'Projects',  icon: I.folder, roles: ['operator'] },
+  { path: '#/billing',  page: 'billing',   label: 'Billing',   icon: I.money,  roles: ['operator'] },
+  { path: '#/settings', page: 'settings',  label: 'Settings',  icon: I.wallet, roles: ['operator'] },
+  { path: '#/portal',   page: 'portal',    label: 'Portal',    icon: I.folder, roles: ['client'] },
+  { path: '#/share',    page: 'share',     label: 'Share',     icon: I.link,   public: true,  nav: false },
+];
+
+function routePath(hash = location.hash || '') {
+  const raw = String(hash || '');
+  const [path] = raw.split('?');
+  return path || '#/';
+}
+
+function findRoute(hash = location.hash || '') {
+  return ROUTES.find(r => r.path === routePath(hash)) || null;
+}
+
+function canAccessRoute(route, user = Users.auth()) {
+  if (!route) return false;
+  if (route.public) return true;
+  return !!user && (!route.roles || route.roles.includes(user.role));
+}
+
+function authRedirectPath(route, { reason = 'auth', next = location.hash || '#/' } = {}) {
+  const intent = route?.roles?.includes('client') ? 'client' : 'operator';
+  return U.setHashParams('#/login', { intent, tab: 'signin', reason, redirect: next });
+}
+
+function visibleRoutesForRole(role) {
+  if (!role) return [];
+  return ROUTES.filter(route => !route.public && route.nav !== false && (!route.roles || route.roles.includes(role)));
+}
+
+function renderPublicShell(content) {
+  const route = findRoute(location.hash || '#/landing');
+  return h`
+    <div class="min-h-screen">
+      <header class="sticky top-0 z-20 backdrop-blur-md" style="background:rgba(9,9,11,.82);border-bottom:1px solid #1c1c1e">
+        <div class="h-16 px-4 md:px-16 flex items-center justify-between gap-4">
+          <a href="${U.href('#/landing', { demo: APP.demo })}" class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl grid place-items-center" style="background: linear-gradient(135deg, #4338ca, #6366f1); color: #fff">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="w-5 h-5"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>
+            </div>
+            <div>
+              <div class="font-display text-lg leading-none" style="color:#fafafa">DeliverPort</div>
+              <div class="text-xs" style="color:#52525b">${CONFIG.tagline}</div>
+            </div>
+          </a>
+          <div class="flex items-center gap-2 flex-wrap justify-end">
+            ${publicHeaderCta(route)}
+          </div>
+        </div>
+      </header>
+      ${content}
+    </div>
+  `;
+}
+
+function renderAppShell(content, { user } = {}) {
+  const me = user || Users.auth() || Users.current();
+  const active = router.current;
+  const navRoutes = visibleRoutesForRole(me?.role);
+  return h`
+    <div class="flex min-h-screen">
+      <aside id="sidebar" class="sidebar w-[260px] shrink-0 border-r hairline bg-[var(--bg-elev)]">
+        <div class="p-5 flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl grid place-items-center" style="background: linear-gradient(135deg, #4338ca, #6366f1); color: #fff; box-shadow: 0 4px 14px -4px rgba(99,102,241,0.5);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="w-5 h-5"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>
+          </div>
+          <div>
+            <div class="font-display text-lg leading-none">DeliverPort</div>
+            <div class="text-xs" style="color:var(--ink-faint)">${CONFIG.tagline}</div>
+          </div>
+        </div>
+
+        <nav class="px-3 pb-4 space-y-1">
+          ${navRoutes.map(r => `
+            <a class="navlink ${r.path === active ? 'active' : ''}" href="${r.path}">
+              ${r.icon}<span>${r.label}</span>
+            </a>
+          `).join('')}
+        </nav>
+
+        <div class="mt-auto p-3 border-t hairline space-y-3">
+          <div class="p-3 rounded-xl" style="background:var(--bg-sunken)">
+            <div class="text-xs" style="color:var(--ink-muted)">Signed in</div>
+            <div class="font-medium mt-1">${U.esc(me?.name || '—')}</div>
+            <div class="text-xs mt-1" style="color:var(--ink-faint)">${U.esc(me?.email || '')} · ${U.esc(me?.role || '')}</div>
+            ${me?.role === 'operator'
+              ? (me.wallet_address
+                  ? `<div class="text-xs font-mono mt-1 break-all" style="color:var(--ink-faint)">${U.esc(me.wallet_address.slice(0,6))}…${U.esc(me.wallet_address.slice(-4))}</div>`
+                  : `<div class="text-xs mt-1" style="color:var(--ink-faint)">Add a wallet address in Settings</div>`)
+              : (me?.client_id
+                  ? `<div class="text-xs mt-1" style="color:var(--ink-faint)">${U.esc(Clients.byId(me.client_id)?.name || 'Client account')}</div>`
+                  : '')}
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-area flex-1 min-w-0">
+        <div class="sticky top-0 z-20 backdrop-blur-md border-b hairline" style="background: color-mix(in srgb, var(--bg) 85%, transparent)">
+          <div class="min-h-14 px-4 md:px-6 py-2 flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-3 min-w-0">
+              <button id="menu-btn" class="btn btn-ghost md:hidden" aria-label="Menu">${I.menu}</button>
+              <div class="hidden md:flex items-center gap-2 text-xs" style="color:var(--ink-muted)">
+                <span class="font-mono">${CONFIG.tagline}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+              <select id="currency" class="field" style="max-width:110px" title="Display currency — ${U.esc(FX.sourceLabel())}">
+                ${CONFIG.currencies.map(c => `
+                  <option value="${c.code}" ${c.code===Store.state.displayCurrency?'selected':''}>${c.symbol} ${c.code}</option>
+                `).join('')}
+              </select>
+              <button id="theme-btn" class="btn btn-ghost" aria-label="Theme">${Store.state.theme==='dark'?I.sun:I.moon}</button>
+              <button id="logout-btn" class="btn btn-ghost">${I.user}<span class="hidden sm:inline">Sign out</span></button>
+            </div>
+          </div>
+        </div>
+        ${content}
+      </main>
+    </div>
+  `;
+}
+
+function renderShell(content, opts = {}) {
+  return opts.public ? renderPublicShell(content) : renderAppShell(content, opts);
+}
+
+const router = {
+  current: '#/',
+  fullHash: '#/',
+  cleanup: null,
+  go(path) {
+    if (location.hash !== path) location.hash = path;
+    else this.render();
+  },
+  async render() {
+    if (typeof this.cleanup === 'function') {
+      try { this.cleanup(); } catch (e) { console.warn('route cleanup failed', e); }
+      this.cleanup = null;
+    }
+    let me = Users.auth();
+    const desiredHash = location.hash || (me ? homePathForUser(me) : '#/landing');
+    const route = findRoute(desiredHash);
+    if (!route) { this.go(me ? homePathForUser(me) : '#/landing'); return; }
+    if (me && authSessionExpired()) {
+      await Store.clearSession();
+      this.go(authRedirectPath(route, { reason: 'expired', next: desiredHash }));
+      return;
+    }
+    if (!canAccessRoute(route, me)) {
+      this.go(me ? homePathForUser(me) : authRedirectPath(route, { reason: 'auth', next: desiredHash }));
+      return;
+    }
+    this.current = route.path;
+    this.fullHash = desiredHash;
+    const page = Pages[route.page];
+    const content = await page();
+    const app = document.getElementById('app');
+    app.innerHTML = renderShell(content, { public: !!route.public, route, user: me || Users.current() });
+    wireShell({ public: !!route.public, route, user: me || Users.current() });
+    if (page.mount) this.cleanup = page.mount() || null;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  },
+};
+
+function wireShell({ public: isPublic = false } = {}) {
+  if (isPublic) {
+    document.getElementById('public-theme-btn')?.addEventListener('click', () => {
+      const next = Store.state.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.classList.toggle('dark', next === 'dark');
+      Store.setTheme(next);
+    });
+    return;
+  }
+
+  document.getElementById('currency')?.addEventListener('change', async e => {
+    await Store.setDisplayCurrency(e.target.value);
+    Toast.show('Currency → ' + e.target.value);
+  });
+  document.getElementById('theme-btn')?.addEventListener('click', () => {
+    const next = Store.state.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.classList.toggle('dark', next === 'dark');
+    Store.setTheme(next);
+  });
+  document.getElementById('logout-btn')?.addEventListener('click', async () => {
+    await Auth.signOut();
+    Toast.show('Signed out');
+    router.go('#/landing');
+  });
+  const menuBtn = document.getElementById('menu-btn');
+  const sidebar = document.getElementById('sidebar');
+  if (menuBtn && sidebar) menuBtn.addEventListener('click', () => sidebar.classList.toggle('open'));
+  sidebar?.querySelectorAll('.navlink').forEach(a => a.addEventListener('click', () => sidebar.classList.remove('open')));
+}
+
+/* ══════════════════════════════════════ 14. BOOT ══════════════════════════════════════ */
+
+async function boot() {
+  try {
+    await DB.init();
+    await Store.rehydrate();
+
+    const [savedDisplayCurrency] = await DB.query(`SELECT value FROM meta WHERE key = 'display_currency'`);
+    if (!savedDisplayCurrency) {
+      const inferred = U.inferDisplayCurrency();
+      if (inferred && inferred !== CONFIG.defaultCurrency) {
+        await Store.setDisplayCurrency(inferred);
+      }
+    }
+
+    await FX.init();
+    document.documentElement.classList.toggle('dark', Store.state.theme === 'dark');
+
+    let chromeState = JSON.stringify({
+      user: Store.state.authUserId,
+      theme: Store.state.theme,
+      currency: Store.state.displayCurrency,
+    });
+    Store.subscribe(() => {
+      const next = JSON.stringify({
+        user: Store.state.authUserId,
+        theme: Store.state.theme,
+        currency: Store.state.displayCurrency,
+      });
+      if (next !== chromeState) {
+        chromeState = next;
+        router.render();
+      }
+    });
+
+    window.addEventListener('hashchange', () => router.render());
+    await router.render();
+    document.getElementById('boot').remove();
+  } catch (err) {
+    console.error(err);
+    const message = err?.message || String(err);
+    const recoverable = /does not exist|no such column|no such table|schema|constraint/i.test(message);
+    document.getElementById('boot').innerHTML = `
+      <div class="max-w-md text-center p-6 space-y-4">
+        <div>
+          <h2 class="h2 mb-2" style="color:var(--danger)">We couldn’t open your workspace</h2>
+          <p class="text-sm mb-4" style="color:var(--ink-muted)">${U.esc(message)}</p>
+          <p class="text-xs" style="color:var(--ink-faint)">Check the browser console for details.</p>
+        </div>
+        ${recoverable ? `
+          <div class="flex gap-2 justify-center flex-wrap">
+            <button class="btn" id="boot-repair">Repair workspace</button>
+            <button class="btn btn-danger" id="boot-reset">${APP.demo ? 'Reset demo data' : 'Reset local workspace'}</button>
+          </div>
+        ` : ''}
+      </div>`;
+    document.getElementById('boot-repair')?.addEventListener('click', async () => {
+      const bootEl = document.getElementById('boot');
+      bootEl.innerHTML = '<div class="max-w-md text-center p-6 text-sm" style="color:var(--ink-muted)">Repairing…</div>';
+      try {
+        if (!DB.pg) { DB.pg = new PGlite(CONFIG.dbName); await DB.pg.waitReady; }
+        await DB.repair();
+        location.reload();
+      } catch (e) {
+        bootEl.innerHTML = `<div class="max-w-md text-center p-6"><h2 class="h2 mb-2" style="color:var(--danger)">Repair failed</h2><p class="text-sm" style="color:var(--ink-muted)">${U.esc(e?.message || String(e))}</p></div>`;
+      }
+    });
+    document.getElementById('boot-reset')?.addEventListener('click', async () => {
+      const bootEl = document.getElementById('boot');
+      bootEl.innerHTML = '<div class="max-w-md text-center p-6 text-sm" style="color:var(--ink-muted)">Resetting…</div>';
+      try {
+        if (!DB.pg) { DB.pg = new PGlite(CONFIG.dbName); await DB.pg.waitReady; }
+        await DB.hardReset();
+        location.reload();
+      } catch (e) {
+        bootEl.innerHTML = `<div class="max-w-md text-center p-6"><h2 class="h2 mb-2" style="color:var(--danger)">Reset failed</h2><p class="text-sm" style="color:var(--ink-muted)">${U.esc(e?.message || String(e))}</p></div>`;
+      }
+    });
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
