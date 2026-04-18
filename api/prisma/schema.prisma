@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  role           String    @default("operator") // 'operator' or 'client'
+  password_hash  String?
+  auth_status    String    @default("active")
+  client_id      String?
+  wallet_address String?
+  phone          String?
+  last_login_at  DateTime?
+  joined_at      DateTime  @default(now())
+
+  client Client? @relation(fields: [client_id], references: [id])
+
+  // Owned resources (multi-tenancy)
+  owned_clients     Client[]    @relation("ClientOwner")
+  owned_projects    Project[]   @relation("ProjectOwner")
+  owned_invoices    Invoice[]   @relation("InvoiceOwner")
+  owned_payout_runs PayoutRun[] @relation("PayoutRunOwner")
+
+  @@map("users")
+}
+
+model Client {
+  id               String   @id @default(cuid())
+  name             String
+  company          String?
+  email            String?
+  country          String   @default("")
+  billing_currency String   @default("USD")
+  status           String   @default("active")
+  notes            String   @default("")
+  created_at       DateTime @default(now())
+  owner_id         String
+
+  owner    User      @relation("ClientOwner", fields: [owner_id], references: [id])
+  users    User[]
+  projects Project[]
+  invoices Invoice[]
+
+  @@map("clients")
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  client_id    String?
+  name         String
+  description  String   @default("")
+  status       String   @default("active")
+  portal_token String?  @unique
+  deliverables Json     @default("[]")
+  created_at   DateTime @default(now())
+  owner_id     String
+
+  owner    User      @relation("ProjectOwner", fields: [owner_id], references: [id])
+  client   Client?   @relation(fields: [client_id], references: [id])
+  invoices Invoice[]
+
+  @@map("projects")
+}
+
+model Invoice {
+  id              String    @id @default(cuid())
+  client_id       String?
+  project_id      String?
+  status          String    @default("draft")
+  line_items      Json      @default("[]")
+  total           Decimal   @default(0)
+  currency        String    @default("USD")
+  payment_rail    String    @default("USDC (Base)")
+  payment_address String?
+  chain           String    @default("base")
+  token           String    @default("USDC")
+  tx_hash         String?
+  due_days        Int       @default(14)
+  notes           String    @default("")
+  issued_at       DateTime  @default(now())
+  paid_at         DateTime?
+  owner_id        String
+
+  owner   User     @relation("InvoiceOwner", fields: [owner_id], references: [id])
+  client  Client?  @relation(fields: [client_id], references: [id])
+  project Project? @relation(fields: [project_id], references: [id])
+
+  @@map("invoices")
+}
+
+model PayoutRun {
+  id           String    @id @default(cuid())
+  status       String    @default("draft")
+  entries      Json      @default("[]")
+  total        Decimal   @default(0)
+  currency     String    @default("USD")
+  payment_rail String    @default("USDC (Base)")
+  notes        String    @default("")
+  created_at   DateTime  @default(now())
+  completed_at DateTime?
+  owner_id     String
+
+  owner User @relation("PayoutRunOwner", fields: [owner_id], references: [id])
+
+  @@map("payout_runs")
+}
+
+model Meta {
+  key   String @id
+  value Json
+
+  @@map("meta")
+}

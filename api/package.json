@@ -1,0 +1,33 @@
+{
+  "name": "deliverport-api",
+  "version": "1.0.0",
+  "description": "DeliverPort backend API — Hono + Prisma + PostgreSQL",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "npx prisma generate && tsc",
+    "start": "node dist/index.js",
+    "db:push": "npx prisma db push",
+    "db:migrate": "npx prisma migrate dev",
+    "db:generate": "npx prisma generate",
+    "db:studio": "npx prisma studio",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["deliverport", "api", "hono", "prisma"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hono/node-server": "^1.14.3",
+    "@prisma/client": "^6.6.0",
+    "hono": "^4.7.9",
+    "jsonwebtoken": "^9.0.2",
+    "prisma": "^6.6.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

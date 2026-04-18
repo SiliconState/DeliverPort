@@ -4,17 +4,17 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>DeliverPort — Share work. Get paid on-chain.</title>
+<title>DeliverPort - Share work. Get paid on-chain.</title>
 <meta name="description" content="The delivery portal for freelancers who bill in USDC on Base. Share deliverables, create invoices, and get paid on-chain." />
 
 <!-- ═══════════════════════════════════════════════════════════════
-     FONTS — editorial + utility pairing
+     FONTS - editorial + utility pairing
      ═══════════════════════════════════════════════════════════════ -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-<!-- Tailwind Play CDN (MVP — swap for build later) -->
+<!-- Tailwind Play CDN (MVP - swap for build later) -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
 <script>
   tailwind.config = {
@@ -74,7 +74,7 @@
   .font-display { font-family: "Instrument Serif", ui-serif, Georgia, serif; letter-spacing: -0.01em; }
   .font-mono    { font-family: "JetBrains Mono", ui-monospace, monospace; }
 
-  /* Glass card — warm, subtle */
+  /* Glass card - warm, subtle */
   .card {
     background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
     border: 1px solid var(--border);
@@ -205,7 +205,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="w-6 h-6"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>
     </div>
     <div class="font-display text-3xl">DeliverPort</div>
-    <div class="mt-3 text-sm" style="color:var(--ink-muted)">Preparing your workspace…</div>
+    <div class="mt-3 text-sm" style="color:var(--ink-muted)">Preparing your workspace...</div>
     <div class="mt-1 text-xs" style="color:var(--ink-faint)">Share work, review progress, and get paid with confidence.</div>
   </div>
 </div>
@@ -216,28 +216,28 @@
 
 <script type="module">
 /* ════════════════════════════════════════════════════════════════════════════
-   DELIVERPORT — single-file app
+   DELIVERPORT - single-file app
    Client delivery portal + on-chain billing for freelancers.
    Organised into labelled sections:
-     1.  CONFIG            — tunables, pricing, currencies
-     2.  ICONS             — inline SVG library
-     3.  UTILS             — helpers (format, csv, download, esc…)
-     4.  AUTH CRYPTO        — password hashing
-     5.  SCHEMA            — SQL DDL (tables, indexes)
-     6.  SEED              — initial demo data
-     7.  DB                — PGlite instance + query facade
-     8.  FX                — live currency conversion
-     9.  STORE             — reactive in-memory projection
-     10. SERVICES          — business logic (Users, Auth, Clients, Projects, Revenue)
-     11. COMPONENTS        — shared UI pieces (Toast, Modal, UI helpers)
-     12. PAGES             — landing, login, dashboard, billing, portal, share
-     13. ROUTER            — hash router + shell layout
-     14. BOOT              — bring up PGlite, hydrate store, first render
+     1.  CONFIG            - tunables, pricing, currencies
+     2.  ICONS             - inline SVG library
+     3.  UTILS             - helpers (format, csv, download, esc...)
+     4.  AUTH CRYPTO        - password hashing
+     5.  SCHEMA            - SQL DDL (tables, indexes)
+     6.  SEED              - initial demo data
+     7.  DB                - PGlite instance + query facade
+     8.  FX                - live currency conversion
+     9.  STORE             - reactive in-memory projection
+     10. SERVICES          - business logic (Users, Auth, Clients, Projects, Revenue)
+     11. COMPONENTS        - shared UI pieces (Toast, Modal, UI helpers)
+     12. PAGES             - landing, login, dashboard, billing, portal, share
+     13. ROUTER            - hash router + shell layout
+     14. BOOT              - bring up PGlite, hydrate store, first render
    ════════════════════════════════════════════════════════════════════════════ */
 
 import { PGlite } from 'https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js';
 
-/* ══════════════════════════════════════ 0. CRYPTO — Base USDC payment layer ══════════════════════════════════════
+/* ══════════════════════════════════════ 0. CRYPTO - Base USDC payment layer ══════════════════════════════════════
    Lazy-loads viem from esm.sh CDN. Only downloaded when a user interacts with wallet features.
    Chain: Base (8453) · Tokens: USDC (6 dec), USDT (6 dec)
    ═══════════════════════════════════════════════════════════════════════════════════════════════════════ */
@@ -313,7 +313,7 @@ const Crypto = {
 
   disconnect() { this._wallet = null; this._account = null; this._notify(); },
   address() { return this._account || null; },
-  shortAddress(addr) { const a = addr || this._account; return a ? a.slice(0,6) + '…' + a.slice(-4) : ''; },
+  shortAddress(addr) { const a = addr || this._account; return a ? a.slice(0,6) + '...' + a.slice(-4) : ''; },
   isConnected() { return !!this._account; },
 
   async getBalance(address, token = 'USDC') {
@@ -467,8 +467,8 @@ const I = {
 /* ══════════════════════════════════════ 3. UTILS ══════════════════════════════════════ */
 const U = {
   uid: (p='id') => p + '_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4),
-  fmtDate: (iso) => iso ? new Date(iso).toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }) : '—',
-  fmtDay: (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '—',
+  fmtDate: (iso) => iso ? new Date(iso).toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }) : '-',
+  fmtDay: (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '-',
   fmtMoney: (n, src, dst) => {
     const srcCur = src || CONFIG.defaultCurrency || 'USD';
     const dstCur = dst || Store.state?.displayCurrency || CONFIG.defaultCurrency || 'USD';
@@ -738,7 +738,7 @@ const SEED_INVOICES = [
       { description: 'Logo suite design', quantity: 1, rate: 1500, amount: 1500 },
       { description: 'Color system & palette', quantity: 1, rate: 1000, amount: 1000 },
     ]),
-    notes: 'Phase 1 — logo + color. Paid via USDC on Base.',  // historical note, intentional
+    notes: 'Phase 1 - logo + color. Paid via USDC on Base.',  // historical note, intentional
   },
   {
     id: 'inv_002',
@@ -755,11 +755,11 @@ const SEED_INVOICES = [
       { description: 'Typography guide', quantity: 1, rate: 800, amount: 800 },
       { description: 'Brand guidelines PDF', quantity: 1, rate: 1000, amount: 1000 },
     ]),
-    notes: 'Phase 2 — typography + guidelines.',
+    notes: 'Phase 2 - typography + guidelines.',
   },
 ];
 
-/* ══════════════════════════════════════ 7. DB — PGlite facade ══════════════════════════════════════ */
+/* ══════════════════════════════════════ 7. DB - PGlite facade ══════════════════════════════════════ */
 const DB = {
   pg: null,
   ready: false,
@@ -944,7 +944,166 @@ const DB = {
   },
 };
 
-/* ══════════════════════════════════════ 8. FX — live currency conversion ══════════════════════════════════
+/* ══════════════════════════════════════ 7b. API CLIENT - remote backend ══════════════════════════════════════ */
+const ApiClient = {
+  baseUrl: '',
+  token: null,
+
+  init(baseUrl) {
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.token = localStorage.getItem('deliverport_jwt') || null;
+  },
+
+  headers(extra = {}) {
+    const h = { 'Content-Type': 'application/json', ...extra };
+    if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+    return h;
+  },
+
+  async _fetch(method, path, body = null) {
+    const url = `${this.baseUrl}${path}`;
+    const opts = { method, headers: this.headers() };
+    if (body !== null) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    if (res.status === 401) {
+      this.token = null;
+      localStorage.removeItem('deliverport_jwt');
+      location.hash = '#/login';
+      throw new Error('Session expired - please sign in again');
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || err.message || `API error ${res.status}`);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+  },
+
+  async get(path)          { return this._fetch('GET', path); },
+  async post(path, body)   { return this._fetch('POST', path, body); },
+  async put(path, body)    { return this._fetch('PUT', path, body); },
+  async del(path)          { return this._fetch('DELETE', path); },
+
+  // ── Auth ──
+  async signIn(email, password) {
+    const data = await this.post('/api/auth/login', { email, password });
+    this.token = data.token;
+    localStorage.setItem('deliverport_jwt', data.token);
+    return data.user;
+  },
+  async signOut() {
+    this.token = null;
+    localStorage.removeItem('deliverport_jwt');
+  },
+  async register({ name, email, password, role = 'operator', wallet_address = '' }) {
+    const data = await this.post('/api/auth/register', { name, email, password, role, wallet_address });
+    this.token = data.token;
+    localStorage.setItem('deliverport_jwt', data.token);
+    return data.user;
+  },
+  async me() {
+    const data = await this.get('/api/auth/me');
+    return data.user || data;
+  },
+
+  // ── Clients ──
+  async getClients()                { return this.get('/api/clients'); },
+  async createClient(data)          { return this.post('/api/clients', data); },
+  async updateClient(id, data)      { return this.put(`/api/clients/${id}`, data); },
+  async deleteClient(id)            { return this.del(`/api/clients/${id}`); },
+
+  // ── Projects ──
+  async getProjects()               { return this.get('/api/projects'); },
+  async createProject(data)         { return this.post('/api/projects', data); },
+  async updateProject(id, data)     { return this.put(`/api/projects/${id}`, data); },
+  async deleteProject(id)           { return this.del(`/api/projects/${id}`); },
+
+  // ── Invoices ──
+  async getInvoices()               { const r = await this.get('/api/invoices'); return r.invoices || r; },
+  async createInvoice(data)         { const r = await this.post('/api/invoices', data); return r.invoice || r; },
+  async updateInvoiceStatus(id, status, extra = {}) { const r = await this.put(`/api/invoices/${id}/status`, { status, ...extra }); return r.invoice || r; },
+  async deleteInvoice(id)           { return this.del(`/api/invoices/${id}`); },
+
+  // ── Payout Runs ──
+  async getPayoutRuns()             { const r = await this.get('/api/payout-runs'); return r.payout_runs || r.payoutRuns || r; },
+  async createPayoutRun(data)       { const r = await this.post('/api/payout-runs', data); return r.payout_run || r.payoutRun || r; },
+  async updatePayoutStatus(id, status, extra = {}) { return this.put(`/api/payout-runs/${id}`, { status, ...extra }); },
+  async deletePayoutRun(id)         { return this.del(`/api/payout-runs/${id}`); },
+
+  // ── Users ──
+  async getUsers()                  { const r = await this.get('/api/users'); return r.users || r; },
+  async updateUser(id, data)        { const r = await this.put(`/api/users/${id}`, data); return r.user || r; },
+
+  // ── Meta (settings/prefs) ──
+  async getMeta()                   { const r = await this.get('/api/meta'); return r.meta || r; },
+  async setMeta(key, value)         { return this.put(`/api/meta/${encodeURIComponent(key)}`, { value }); },
+  async deleteMeta(keys)            { return this.post('/api/meta/delete', { keys }); },
+
+  // ── Portal (public, no auth) ──
+  async getPortal(token) {
+    const url = `${this.baseUrl}/api/portal/${encodeURIComponent(token)}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return res.json();
+  },
+
+  // ── Health ──
+  async health() {
+    const url = `${this.baseUrl}/api/health`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    return res.ok;
+  },
+};
+
+/* ══════════════════════════════════════ 7c. DATA LAYER - mode switch ══════════════════════════════════════ */
+const DataLayer = {
+  mode: 'local', // 'local' | 'api'
+
+  init() {
+    const apiUrl = new URL(window.location.href).searchParams.get('api')
+                   || localStorage.getItem('deliverport_api_url');
+    if (apiUrl) {
+      this.mode = 'api';
+      localStorage.setItem('deliverport_api_url', apiUrl);
+      ApiClient.init(apiUrl);
+    }
+  },
+
+  isApi()   { return this.mode === 'api'; },
+  isLocal() { return this.mode === 'local'; },
+
+  apiUrl() {
+    return this.isApi() ? ApiClient.baseUrl : null;
+  },
+
+  async setApiUrl(url) {
+    if (url) {
+      localStorage.setItem('deliverport_api_url', url);
+      this.mode = 'api';
+      ApiClient.init(url);
+    } else {
+      localStorage.removeItem('deliverport_api_url');
+      localStorage.removeItem('deliverport_jwt');
+      this.mode = 'local';
+    }
+  },
+
+  async checkConnection() {
+    if (!this.isApi()) return { ok: false, reason: 'local' };
+    try {
+      const ok = await ApiClient.health();
+      return { ok, reason: ok ? 'connected' : 'unreachable' };
+    } catch (e) {
+      return { ok: false, reason: e.message };
+    }
+  },
+
+  modeLabel() {
+    return this.isApi() ? '☁️ Connected' : '💾 Local';
+  },
+};
+
+/* ══════════════════════════════════════ 8. FX - live currency conversion ══════════════════════════════════
    Lightweight, battle-tested FX via @fawazahmed0/currency-api on jsDelivr CDN.
    - No API key, no rate limits, daily updates, 200+ currencies.
    - Cached in the meta table for 24h so we don't re-fetch on every reload.
@@ -965,12 +1124,27 @@ const FX = {
 
   async init() {
     try {
-      const [row] = await DB.query(`SELECT value FROM meta WHERE key = 'fx_rates'`);
-      if (row?.value?.rates && row.value.updated) {
-        const age = Date.now() - new Date(row.value.updated).getTime();
-        if (age < this.cacheHours * 3600 * 1000) {
-          this.rates = row.value.rates;
-          this.updated = row.value.updated;
+      if (DataLayer.isApi()) {
+        // In API mode, cache FX in localStorage
+        const cached = localStorage.getItem('deliverport_fx_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.rates && parsed.updated) {
+            const age = Date.now() - new Date(parsed.updated).getTime();
+            if (age < this.cacheHours * 3600 * 1000) {
+              this.rates = parsed.rates;
+              this.updated = parsed.updated;
+            }
+          }
+        }
+      } else {
+        const [row] = await DB.query(`SELECT value FROM meta WHERE key = 'fx_rates'`);
+        if (row?.value?.rates && row.value.updated) {
+          const age = Date.now() - new Date(row.value.updated).getTime();
+          if (age < this.cacheHours * 3600 * 1000) {
+            this.rates = row.value.rates;
+            this.updated = row.value.updated;
+          }
         }
       }
     } catch { /* ignore */ }
@@ -990,11 +1164,16 @@ const FX = {
         if (!data?.usd) throw new Error('bad payload');
         this.rates = data.usd;
         this.updated = data.date || new Date().toISOString().slice(0,10);
-        await DB.query(
-          `INSERT INTO meta(key,value) VALUES ('fx_rates', $1::jsonb)
-           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-          [JSON.stringify({ rates: this.rates, updated: new Date().toISOString(), source: url })]
-        );
+        const cachePayload = { rates: this.rates, updated: new Date().toISOString(), source: url };
+        if (DataLayer.isApi()) {
+          localStorage.setItem('deliverport_fx_cache', JSON.stringify(cachePayload));
+        } else {
+          await DB.query(
+            `INSERT INTO meta(key,value) VALUES ('fx_rates', $1::jsonb)
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+            [JSON.stringify(cachePayload)]
+          );
+        }
         return true;
       } catch (e) {
         console.warn('[FX] fetch failed:', url, e.message);
@@ -1025,13 +1204,13 @@ const FX = {
   },
 
   sourceLabel() {
-    if (!this.updated) return 'loading…';
+    if (!this.updated) return 'loading...';
     if (this.updated === 'offline') return 'offline fallback';
     return 'updated ' + String(this.updated).slice(0, 10);
   },
 };
 
-/* ══════════════════════════════════════ 9. STORE — reactive projection ══════════════════════════════════════ */
+/* ══════════════════════════════════════ 9. STORE - reactive projection ══════════════════════════════════════ */
 const Store = {
   state: {
     clients: [],
@@ -1048,27 +1227,61 @@ const Store = {
   subs: new Set(),
 
   async rehydrate() {
-    const [clients, projects, invoices, payoutRuns, users, meta] = await Promise.all([
-      DB.query(`SELECT * FROM clients ORDER BY created_at, name`),
-      DB.query(`SELECT * FROM projects ORDER BY created_at, name`),
-      DB.query(`SELECT * FROM invoices ORDER BY issued_at DESC`),
-      DB.query(`SELECT * FROM payout_runs ORDER BY created_at DESC`),
-      DB.query(`SELECT * FROM users ORDER BY joined_at`),
-      DB.query(`SELECT key, value FROM meta`),
-    ]);
-    const metaMap = Object.fromEntries(meta.map(r => [r.key, r.value]));
-    this.state = {
-      clients,
-      projects: projects.map(normalizeProject),
-      invoices: invoices.map(normalizeInvoice),
-      payoutRuns: payoutRuns.map(normalizePayoutRun),
-      users,
-      authUserId: metaMap.auth_user_id || null,
-      currentUserId: metaMap.current_user || metaMap.auth_user_id || null,
-      theme: metaMap.theme || 'light',
-      displayCurrency: metaMap.display_currency || CONFIG.defaultCurrency || 'USD',
-      meta: metaMap,
-    };
+    if (DataLayer.isApi()) {
+      try {
+        const [clients, projects, invoices, payoutRuns, users, metaArr] = await Promise.all([
+          ApiClient.getClients().catch(() => []),
+          ApiClient.getProjects().catch(() => []),
+          ApiClient.getInvoices().catch(() => []),
+          ApiClient.getPayoutRuns().catch(() => []),
+          ApiClient.getUsers().catch(() => []),
+          ApiClient.getMeta().catch(() => []),
+        ]);
+        const metaMap = Array.isArray(metaArr)
+          ? Object.fromEntries(metaArr.map(r => [r.key, r.value]))
+          : (metaArr || {});
+        // Merge locally-stored prefs (theme, currency) with server meta
+        const localTheme = localStorage.getItem('deliverport_theme');
+        const localCurrency = localStorage.getItem('deliverport_display_currency');
+        const localAuthUserId = localStorage.getItem('deliverport_auth_user_id');
+        this.state = {
+          clients: clients || [],
+          projects: (projects || []).map(normalizeProject),
+          invoices: (invoices || []).map(normalizeInvoice),
+          payoutRuns: (payoutRuns || []).map(normalizePayoutRun),
+          users: users || [],
+          authUserId: localAuthUserId || metaMap.auth_user_id || null,
+          currentUserId: localAuthUserId || metaMap.current_user || metaMap.auth_user_id || null,
+          theme: localTheme || metaMap.theme || 'light',
+          displayCurrency: localCurrency || metaMap.display_currency || CONFIG.defaultCurrency || 'USD',
+          meta: metaMap,
+        };
+      } catch (e) {
+        console.warn('[Store] API rehydrate failed:', e.message);
+      }
+    } else {
+      const [clients, projects, invoices, payoutRuns, users, meta] = await Promise.all([
+        DB.query(`SELECT * FROM clients ORDER BY created_at, name`),
+        DB.query(`SELECT * FROM projects ORDER BY created_at, name`),
+        DB.query(`SELECT * FROM invoices ORDER BY issued_at DESC`),
+        DB.query(`SELECT * FROM payout_runs ORDER BY created_at DESC`),
+        DB.query(`SELECT * FROM users ORDER BY joined_at`),
+        DB.query(`SELECT key, value FROM meta`),
+      ]);
+      const metaMap = Object.fromEntries(meta.map(r => [r.key, r.value]));
+      this.state = {
+        clients,
+        projects: projects.map(normalizeProject),
+        invoices: invoices.map(normalizeInvoice),
+        payoutRuns: payoutRuns.map(normalizePayoutRun),
+        users,
+        authUserId: metaMap.auth_user_id || null,
+        currentUserId: metaMap.current_user || metaMap.auth_user_id || null,
+        theme: metaMap.theme || 'light',
+        displayCurrency: metaMap.display_currency || CONFIG.defaultCurrency || 'USD',
+        meta: metaMap,
+      };
+    }
     this.emit();
   },
 
@@ -1076,31 +1289,58 @@ const Store = {
   emit() { for (const fn of this.subs) fn(this.state); },
 
   async setCurrentUser(id) {
-    await DB.query(`INSERT INTO meta(key,value) VALUES ('current_user', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(id)]);
+    if (DataLayer.isApi()) {
+      localStorage.setItem('deliverport_auth_user_id', id);
+    } else {
+      await DB.query(`INSERT INTO meta(key,value) VALUES ('current_user', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(id)]);
+    }
     await this.rehydrate();
   },
   async setAuthUser(id) {
     const startedAt = new Date().toISOString();
-    await DB.query(`INSERT INTO meta(key,value) VALUES ('auth_user_id', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(id)]);
-    await DB.query(`INSERT INTO meta(key,value) VALUES ('auth_started_at', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(startedAt)]);
+    if (DataLayer.isApi()) {
+      localStorage.setItem('deliverport_auth_user_id', id);
+      localStorage.setItem('deliverport_auth_started_at', startedAt);
+    } else {
+      await DB.query(`INSERT INTO meta(key,value) VALUES ('auth_user_id', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(id)]);
+      await DB.query(`INSERT INTO meta(key,value) VALUES ('auth_started_at', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(startedAt)]);
+    }
     await this.setCurrentUser(id);
   },
   async clearSession() {
-    await DB.exec(`DELETE FROM meta WHERE key IN ('auth_user_id','current_user','auth_started_at')`);
+    if (DataLayer.isApi()) {
+      await ApiClient.signOut();
+      localStorage.removeItem('deliverport_auth_user_id');
+      localStorage.removeItem('deliverport_auth_started_at');
+    } else {
+      await DB.exec(`DELETE FROM meta WHERE key IN ('auth_user_id','current_user','auth_started_at')`);
+    }
     await this.rehydrate();
   },
   async setTheme(theme) {
-    await DB.query(`INSERT INTO meta(key,value) VALUES ('theme', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(theme)]);
+    if (DataLayer.isApi()) {
+      localStorage.setItem('deliverport_theme', theme);
+    } else {
+      await DB.query(`INSERT INTO meta(key,value) VALUES ('theme', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(theme)]);
+    }
     this.state.theme = theme;
     this.emit();
   },
   async setDisplayCurrency(code) {
-    await DB.query(`INSERT INTO meta(key,value) VALUES ('display_currency', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(code)]);
+    if (DataLayer.isApi()) {
+      localStorage.setItem('deliverport_display_currency', code);
+    } else {
+      await DB.query(`INSERT INTO meta(key,value) VALUES ('display_currency', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(code)]);
+    }
     this.state.displayCurrency = code;
     this.emit();
   },
   async setMeta(key, value) {
-    await DB.query(`INSERT INTO meta(key,value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [key, JSON.stringify(value)]);
+    if (DataLayer.isApi()) {
+      await ApiClient.setMeta(key, value).catch(() => {});
+    } else {
+      await DB.query(`INSERT INTO meta(key,value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [key, JSON.stringify(value)]);
+    }
     this.state.meta = { ...this.state.meta, [key]: value };
     this.emit();
   },
@@ -1138,6 +1378,17 @@ const Users = {
   current: () => Users.byId(Store.state.currentUserId) || null,
   auth: () => Users.byId(Store.state.authUserId) || null,
   async update(id, payload) {
+    if (DataLayer.isApi()) {
+      await ApiClient.updateUser(id, {
+        name: String(payload.name || '').trim(),
+        email: String(payload.email || '').trim(),
+        wallet_address: String(payload.wallet_address || '').trim() || null,
+        phone: String(payload.phone || '').trim() || null,
+      });
+      await Store.rehydrate();
+      return Users.byId(id);
+    }
+    // Local mode
     const nextEmail = String(payload.email || '').trim();
     if (nextEmail) {
       const rows = await DB.query(`SELECT id FROM users WHERE lower(email) = lower($1) AND id <> $2 LIMIT 1`, [nextEmail, id]);
@@ -1153,6 +1404,13 @@ const Users = {
 };
 
 function authSessionExpired() {
+  if (DataLayer.isApi()) {
+    const startedAt = localStorage.getItem('deliverport_auth_started_at');
+    if (!startedAt || !Store.state.authUserId) return false;
+    const startedMs = Date.parse(startedAt);
+    if (!Number.isFinite(startedMs)) return false;
+    return (Date.now() - startedMs) > (CONFIG.auth.sessionHours * 3600 * 1000);
+  }
   const startedAt = Store.state.meta?.auth_started_at;
   if (!startedAt || !Store.state.authUserId) return false;
   const startedMs = Date.parse(startedAt);
@@ -1168,6 +1426,13 @@ const Auth = {
     ];
   },
   async signIn(email, password) {
+    if (DataLayer.isApi()) {
+      const user = await ApiClient.signIn(email, password);
+      await Store.setAuthUser(user.id);
+      await Store.rehydrate();
+      return Users.byId(user.id) || user;
+    }
+    // Local mode
     const [user] = await DB.query(`SELECT * FROM users WHERE lower(email) = lower($1) LIMIT 1`, [String(email || '').trim()]);
     if (!user) throw new Error('No account found for that email');
     if (user.auth_status === 'disabled') throw new Error('This account is disabled');
@@ -1179,6 +1444,13 @@ const Auth = {
   },
   async signOut() { await Store.clearSession(); },
   async register({ name, email, password, role = 'operator', wallet_address = '' }) {
+    if (DataLayer.isApi()) {
+      const user = await ApiClient.register({ name, email, password, role, wallet_address });
+      await Store.setAuthUser(user.id);
+      await Store.rehydrate();
+      return Users.byId(user.id) || user;
+    }
+    // Local mode
     if (role === 'operator') await DB.prepareRealWorkspace();
     const [existing] = await DB.query(`SELECT id FROM users WHERE lower(email) = lower($1)`, [email.trim()]);
     if (existing) throw new Error('An account with that email already exists');
@@ -1232,6 +1504,19 @@ const Clients = {
   all: () => Store.state.clients,
   byId: (id) => Store.state.clients.find(c => c.id === id),
   async create(payload) {
+    if (DataLayer.isApi()) {
+      const result = await ApiClient.createClient({
+        name: payload.name,
+        company: payload.company || null,
+        email: payload.email || null,
+        country: payload.country || null,
+        billing_currency: payload.billing_currency || 'USD',
+        status: payload.status || 'active',
+        notes: payload.notes || null,
+      });
+      await Store.rehydrate();
+      return result.id || result;
+    }
     const id = payload.id || U.uid('client');
     await DB.query(
       `INSERT INTO clients(id,name,company,email,country,billing_currency,status,notes)
@@ -1242,6 +1527,19 @@ const Clients = {
     return id;
   },
   async update(id, payload) {
+    if (DataLayer.isApi()) {
+      await ApiClient.updateClient(id, {
+        name: payload.name,
+        company: payload.company || null,
+        email: payload.email || null,
+        country: payload.country || null,
+        billing_currency: payload.billing_currency || 'USD',
+        status: payload.status || 'active',
+        notes: payload.notes || null,
+      });
+      await Store.rehydrate();
+      return;
+    }
     await DB.query(
       `UPDATE clients SET name=$2, company=$3, email=$4, country=$5, billing_currency=$6, status=$7, notes=$8 WHERE id=$1`,
       [id, payload.name, payload.company || null, payload.email || null, payload.country || null, payload.billing_currency || 'USD', payload.status || 'active', payload.notes || null]
@@ -1264,6 +1562,20 @@ const Projects = {
       const plan = Plan.current();
       throw new Error(`Free plan is limited to ${plan.maxProjects} projects. Upgrade to Pro for unlimited projects.`);
     }
+    if (DataLayer.isApi()) {
+      const result = await ApiClient.createProject({
+        client_id: payload.client_id,
+        name: payload.name,
+        description: payload.description || null,
+        status: payload.status || 'active',
+        portal_token: payload.portal_token || U.uid('portal'),
+        deliverables: payload.deliverables || [],
+        start_at: payload.start_at || null,
+        due_at: payload.due_at || null,
+      });
+      await Store.rehydrate();
+      return result.id || result;
+    }
     const id = payload.id || U.uid('proj');
     await DB.query(
       `INSERT INTO projects(id,client_id,name,description,status,portal_token,deliverables,start_at,due_at)
@@ -1278,6 +1590,18 @@ const Projects = {
     if (payload.status === 'archived' && !Plan.canArchiveProject()) {
       throw new Error('Archiving projects is a Pro feature. Upgrade to manage project lifecycle.');
     }
+    if (DataLayer.isApi()) {
+      await ApiClient.updateProject(id, {
+        name: payload.name,
+        description: payload.description || null,
+        status: payload.status || 'active',
+        deliverables: payload.deliverables || [],
+        start_at: payload.start_at || null,
+        due_at: payload.due_at || null,
+      });
+      await Store.rehydrate();
+      return;
+    }
     await DB.query(
       `UPDATE projects SET name=$2, description=$3, status=$4, deliverables=$5::jsonb, start_at=$6, due_at=$7 WHERE id=$1`,
       [id, payload.name, payload.description || null, payload.status || 'active', payload.deliverables ? JSON.stringify(payload.deliverables) : '[]', payload.start_at || null, payload.due_at || null]
@@ -1285,6 +1609,11 @@ const Projects = {
     await Store.rehydrate();
   },
   async updateDeliverables(id, deliverables) {
+    if (DataLayer.isApi()) {
+      await ApiClient.updateProject(id, { deliverables });
+      await Store.rehydrate();
+      return;
+    }
     await DB.query(`UPDATE projects SET deliverables=$2::jsonb WHERE id=$1`, [id, JSON.stringify(deliverables)]);
     await Store.rehydrate();
   },
@@ -1310,11 +1639,24 @@ const Revenue = {
     const amount = cleanLineItems.reduce((sum, li) => sum + (Number(li.amount) || 0), 0);
     if (amount <= 0) throw new Error('Invoice total must be greater than zero');
     if (isOnChainRail(provider) && !String(paymentAddress || '').trim()) throw new Error('Add a wallet address before creating this invoice');
-    // Derive chain + token from provider
     const chain = isOnChainRail(provider) ? 'base' : null;
     const token = provider === 'USDT (Base)' ? 'USDT' : provider === 'USDC (Base)' ? 'USDC' : null;
-    const id = U.uid('inv');
     const dueAt = new Date(Date.now() + dueDays * 24 * 3600 * 1000).toISOString();
+    if (DataLayer.isApi()) {
+      const result = await ApiClient.createInvoice({
+        client_id: resolvedClientId,
+        project_id: projectId || null,
+        currency, amount, provider,
+        line_items: cleanLineItems,
+        notes: notes || null,
+        due_at: dueAt,
+        payment_address: paymentAddress || null,
+        chain, token,
+      });
+      await Store.rehydrate();
+      return result.id || result;
+    }
+    const id = U.uid('inv');
     await DB.query(
       `INSERT INTO invoices(id,client_id,project_id,status,currency,amount,provider,line_items,notes,due_at,payment_address,chain,token)
        VALUES ($1,$2,$3,'draft',$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12)`,
@@ -1325,6 +1667,11 @@ const Revenue = {
   },
 
   async setInvoiceStatus(id, status, extra = {}) {
+    if (DataLayer.isApi()) {
+      await ApiClient.updateInvoiceStatus(id, status, extra);
+      await Store.rehydrate();
+      return;
+    }
     await DB.query(
       `UPDATE invoices SET status=$2, provider=COALESCE($3,provider), external_ref=COALESCE($4,external_ref),
               paid_at = CASE WHEN $2='paid' THEN now() ELSE paid_at END WHERE id=$1`,
@@ -1334,13 +1681,26 @@ const Revenue = {
   },
 
   async deleteInvoice(id) {
+    if (DataLayer.isApi()) {
+      await ApiClient.deleteInvoice(id);
+      await Store.rehydrate();
+      return;
+    }
     await DB.query(`DELETE FROM invoices WHERE id=$1`, [id]);
     await Store.rehydrate();
   },
 
   async createPayoutRun({ lineItems = [], currency = 'USD', provider = 'USDC (Base)' } = {}) {
-    const id = U.uid('pay');
     const amount = lineItems.reduce((sum, li) => sum + (Number(li.amount) || 0), 0);
+    if (DataLayer.isApi()) {
+      const result = await ApiClient.createPayoutRun({
+        currency, amount, provider,
+        line_items: lineItems,
+      });
+      await Store.rehydrate();
+      return result.id || result;
+    }
+    const id = U.uid('pay');
     await DB.query(
       `INSERT INTO payout_runs(id,status,currency,amount,provider,line_items)
        VALUES ($1,'draft',$2,$3,$4,$5::jsonb)`,
@@ -1351,6 +1711,11 @@ const Revenue = {
   },
 
   async setPayoutStatus(id, status, extra = {}) {
+    if (DataLayer.isApi()) {
+      await ApiClient.updatePayoutStatus(id, status, extra);
+      await Store.rehydrate();
+      return;
+    }
     await DB.query(
       `UPDATE payout_runs SET status=$2, provider=COALESCE($3,provider), external_ref=COALESCE($4,external_ref),
               queued_at = CASE WHEN $2='queued' THEN COALESCE(queued_at,now()) ELSE queued_at END,
@@ -1439,7 +1804,7 @@ const UI = {
       in_progress: { cls:'chip-indigo', label:'In progress' },
       pending:     { cls:'chip-amber',  label:'Pending' },
     };
-    const m = map[status] || { cls:'', label: status || '—' };
+    const m = map[status] || { cls:'', label: status || '-' };
     return `<span class="chip ${m.cls}"><span class="chip-dot"></span>${m.label}</span>`;
   },
   barChart(items, { max, color='var(--brand)' } = {}) {
@@ -1553,7 +1918,7 @@ function invoiceStatusTone(inv) {
 function invoiceStatusNote(inv) {
   if (!inv) return '';
   if (invoiceIsOverdue(inv)) return `Payment overdue since ${U.fmtDay(inv.due_at)}.`;
-  if (inv.status === 'draft') return 'Internal draft — not visible to clients yet.';
+  if (inv.status === 'draft') return 'Internal draft - not visible to clients yet.';
   if (inv.status === 'sent') return inv.due_at ? `Awaiting payment by ${U.fmtDay(inv.due_at)}.` : 'Sent to client and awaiting payment.';
   if (inv.status === 'paid') return inv.paid_at ? `Paid ${U.fmtDay(inv.paid_at)}.` : 'Payment recorded.';
   return '';
@@ -1567,7 +1932,7 @@ function renderInvoicePrimaryAction(inv) {
 }
 
 function renderInvoicePaymentBlock(inv, { compact = false } = {}) {
-  const due = inv?.due_at ? U.fmtDay(inv.due_at) : '—';
+  const due = inv?.due_at ? U.fmtDay(inv.due_at) : '-';
   const copyBtn = inv?.payment_address ? `<button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.payment_address)}">${I.copy}<span>Copy address</span></button>` : '';
   return `
     <div class="space-y-2">
@@ -1598,7 +1963,7 @@ Pages.landing = async () => {
               Share work.<br/>Get paid in USDC.
             </h1>
             <p class="mt-8 leading-relaxed" style="color:#a1a1aa;max-width:560px;font-size:1.05rem">
-              DeliverPort gives freelancers a clean client portal, clear invoice flow, and payment instructions on Base — without sending clients into a maze.
+              DeliverPort gives freelancers a clean client portal, clear invoice flow, and payment instructions on Base - without sending clients into a maze.
             </p>
             <div class="mt-10 flex gap-3 flex-wrap">
               <a class="inline-block px-5 py-2.5 rounded-lg text-sm font-medium" href="${U.href(U.setHashParams('#/login', { tab: 'register', intent: 'operator' }))}" style="background:#fff;color:#09090b">Create workspace</a>
@@ -1722,7 +2087,7 @@ Pages.login = async () => {
       // fall through to render login
     } else {
       requestAnimationFrame(() => router.go(homePathForUser(me)));
-      return `<div class="max-w-xl mx-auto p-10">Redirecting…</div>`;
+      return `<div class="max-w-xl mx-auto p-10">Redirecting...</div>`;
     }
   }
   const intent = params.intent === 'client' ? 'client' : 'operator';
@@ -1880,7 +2245,7 @@ Pages.login.mount = () => {
     e.preventDefault();
     loginError.textContent = '';
     const submitBtn = loginForm.querySelector('[type="submit"]');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Signing in…'; }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Signing in...'; }
     const fd = new FormData(loginForm);
     try {
       const user = await Auth.signIn(fd.get('email'), fd.get('password'));
@@ -1902,7 +2267,7 @@ Pages.login.mount = () => {
         wallet_address: fd.get('wallet') || '',
         role: 'operator',
       });
-      Toast.show(`Workspace created — welcome, ${user.name}!`);
+      Toast.show(`Workspace created - welcome, ${user.name}!`);
       router.go('#/');
     } catch (err) { registerError.textContent = err.message || String(err); }
   });
@@ -1926,7 +2291,7 @@ function renderProjectRows(projects, { limit = null } = {}) {
             ${UI.statusChip(project.status)}
           </div>
           <div class="text-xs mt-1" style="color:var(--ink-muted)">
-            ${U.esc(client?.name || '—')} · ${delivered}/${deliverables.length} deliverables · ${U.fmtMoney(outstanding, 'USD')} outstanding · ${U.fmtMoney(collected, 'USD')} collected
+            ${U.esc(client?.name || '-')} · ${delivered}/${deliverables.length} deliverables · ${U.fmtMoney(outstanding, 'USD')} outstanding · ${U.fmtMoney(collected, 'USD')} collected
           </div>
         </div>
         <div class="flex gap-2 flex-wrap items-center">
@@ -1989,7 +2354,7 @@ Pages.dashboard = async () => {
           <h1 class="h1 mt-1">Your delivery workspace.</h1>
           <div class="flex items-center gap-2 mt-2">${planBadgeHTML()}</div>
           <p class="max-w-2xl mt-3 text-sm leading-relaxed" style="color:var(--ink-muted)">
-            Keep clients, projects, invoices, and payout setup in one place — with a clear next step when the workspace is still getting started.
+            Keep clients, projects, invoices, and payout setup in one place - with a clear next step when the workspace is still getting started.
           </p>
         </div>
         <div class="flex gap-2 flex-wrap">
@@ -2085,7 +2450,7 @@ function openNewProjectModal(prefill = {}) {
       <div class="space-y-4">
         <div class="card-flat p-5 text-center">
           <div class="font-display text-5xl" style="color:var(--brand)">${plan.maxProjects}/${plan.maxProjects}</div>
-          <div class="text-sm mt-2" style="color:var(--ink-muted)">You’ve used both projects on the Free plan.</div>
+          <div class="text-sm mt-2" style="color:var(--ink-muted)">You've used both projects on the Free plan.</div>
         </div>
         <div class="card-flat p-4">
           <div class="font-medium">Upgrade to Pro</div>
@@ -2101,7 +2466,7 @@ function openNewProjectModal(prefill = {}) {
         root.querySelector('#upgrade-to-pro')?.addEventListener('click', async () => {
           await Plan.upgrade('pro');
           Modal.close();
-          Toast.show('Upgraded to Pro — unlimited projects');
+          Toast.show('Upgraded to Pro - unlimited projects');
           await router.render();
         });
       }
@@ -2114,7 +2479,7 @@ function openNewProjectModal(prefill = {}) {
       <div>
         <label class="lbl">Client</label>
         <select class="field" name="client_id" required>
-          <option value="">Select client…</option>
+          <option value="">Select client...</option>
           ${clients.map(c => `<option value="${c.id}" ${c.id === prefill.client_id ? 'selected' : ''}>${U.esc(c.name)}</option>`).join('')}
         </select>
       </div>
@@ -2124,7 +2489,7 @@ function openNewProjectModal(prefill = {}) {
       </div>
       <div>
         <label class="lbl">Description</label>
-        <textarea class="field" name="description" placeholder="Brief description of the project scope…">${U.esc(prefill.description || '')}</textarea>
+        <textarea class="field" name="description" placeholder="Brief description of the project scope...">${U.esc(prefill.description || '')}</textarea>
       </div>
       <div class="flex justify-end gap-2">
         <button type="button" class="btn" data-close>Cancel</button>
@@ -2175,7 +2540,7 @@ function openClientModal(clientId = null) {
       </div>
       <div>
         <label class="lbl">Notes</label>
-        <textarea class="field" name="notes" placeholder="Any extra context…">${U.esc(existing?.notes || '')}</textarea>
+        <textarea class="field" name="notes" placeholder="Any extra context...">${U.esc(existing?.notes || '')}</textarea>
       </div>
       <div class="flex justify-end gap-2">
         <button type="button" class="btn" data-close>Cancel</button>
@@ -2196,8 +2561,7 @@ function openClientModal(clientId = null) {
             notes: fd.get('notes'),
           };
           if (existing) {
-            await DB.query(`UPDATE clients SET name=$2, email=$3, company=$4, country=$5, notes=$6 WHERE id=$1`, [existing.id, payload.name, payload.email || null, payload.company || null, payload.country || null, payload.notes || null]);
-            await Store.rehydrate();
+            await Clients.update(existing.id, payload);
             Toast.show('Client updated');
           } else {
             await Clients.create(payload);
@@ -2333,13 +2697,15 @@ function bindOperatorWorkspaceActions() {
     Toast.show('Copied');
   }));
   document.getElementById('repair-btn')?.addEventListener('click', async () => {
+    if (DataLayer.isApi()) { Toast.show('Repair is only available in local mode', 'err'); return; }
     try {
       const health = await DB.repair();
-      Toast.show(health.ok ? 'Workspace repaired' : 'Repair ran — check health');
+      Toast.show(health.ok ? 'Workspace repaired' : 'Repair ran - check health');
       await router.render();
     } catch (err) { Toast.show('Repair failed: ' + err.message, 'err'); }
   });
   document.getElementById('reset-btn')?.addEventListener('click', async () => {
+    if (DataLayer.isApi()) { Toast.show('Reset is only available in local mode', 'err'); return; }
     if (!confirm(APP.demo ? 'Reset demo data for this browser?' : 'Reset the local workspace for this browser? This cannot be undone.')) return;
     try {
       await DB.hardReset({ seedDemo: APP.demo });
@@ -2494,6 +2860,29 @@ Pages.settings = async () => {
       </section>
 
       <section class="card p-6">
+        <div class="eyebrow">Backend</div>
+        <h2 class="h2 mt-1">Data backend</h2>
+        <div class="text-sm mt-3" style="color:var(--ink-muted)">Connect to a remote API server so data persists across devices. Leave empty to use local browser storage.</div>
+        <div class="card-flat p-4 mt-5 space-y-4">
+          <div class="flex items-center justify-between gap-4 flex-wrap">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium">${DataLayer.modeLabel()}</span>
+              ${DataLayer.isApi() ? `<span class="chip chip-moss"><span class="chip-dot"></span>API</span>` : `<span class="chip"><span class="chip-dot"></span>Browser</span>`}
+            </div>
+            <span id="backend-status" class="text-xs" style="color:var(--ink-faint)">${DataLayer.isApi() ? 'Checking...' : 'Using local PGlite'}</span>
+          </div>
+          <form id="backend-url-form" class="flex gap-2 items-end flex-wrap">
+            <div class="flex-1 min-w-[200px]">
+              <label class="lbl">API URL</label>
+              <input class="field font-mono text-xs" name="api_url" placeholder="https://api.deliverport.io" value="${U.esc(DataLayer.apiUrl() || '')}" />
+            </div>
+            <button type="submit" class="btn btn-primary">Connect</button>
+            ${DataLayer.isApi() ? `<button type="button" class="btn btn-danger" id="backend-disconnect">Disconnect</button>` : ''}
+          </form>
+        </div>
+      </section>
+
+      <section class="card p-6">
         <div class="eyebrow">Advanced</div>
         <h2 class="h2 mt-1">Local workspace controls</h2>
         <div class="text-sm mt-3" style="color:var(--ink-muted)">These controls affect only the current browser workspace.</div>
@@ -2539,9 +2928,46 @@ Pages.settings.mount = () => {
   });
   document.getElementById('settings-upgrade')?.addEventListener('click', async () => {
     await Plan.upgrade('pro');
-    Toast.show('Upgraded to Pro — unlimited projects');
+    Toast.show('Upgraded to Pro - unlimited projects');
     await router.render();
   });
+
+  // Backend settings handlers
+  document.getElementById('backend-url-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const url = String(fd.get('api_url') || '').trim();
+    if (!url) { Toast.show('Enter an API URL', 'err'); return; }
+    try {
+      new URL(url); // validate URL format
+    } catch { Toast.show('Invalid URL format', 'err'); return; }
+    try {
+      await DataLayer.setApiUrl(url);
+      const check = await DataLayer.checkConnection();
+      if (check.ok) {
+        Toast.show('Connected to backend \u2014 reloading...');
+        setTimeout(() => location.reload(), 500);
+      } else {
+        Toast.show('URL saved but server unreachable: ' + check.reason, 'err');
+        await router.render();
+      }
+    } catch (err) { Toast.show('Connection failed: ' + err.message, 'err'); }
+  });
+  document.getElementById('backend-disconnect')?.addEventListener('click', async () => {
+    await DataLayer.setApiUrl(null);
+    Toast.show('Disconnected \u2014 switched to local mode');
+    setTimeout(() => location.reload(), 500);
+  });
+  // Check connection status on load
+  if (DataLayer.isApi()) {
+    DataLayer.checkConnection().then(result => {
+      const el = document.getElementById('backend-status');
+      if (el) {
+        el.textContent = result.ok ? 'Connected' : 'Unreachable: ' + result.reason;
+        el.style.color = result.ok ? '#1f5d23' : 'var(--danger)';
+      }
+    });
+  }
 };
 
 /* ─────────── BILLING ─────────── */
@@ -2623,8 +3049,8 @@ Pages.billing = async () => {
                       ${UI.statusChip(statusTone)}
                       <span class="text-xs" style="color:var(--ink-faint)">Issued ${U.fmtDay(inv.issued_at)}</span>
                     </div>
-                    <div class="text-sm mt-2" style="color:var(--ink-muted)">${U.esc(client?.name || '—')} · ${U.esc(project?.name || 'No project')}</div>
-                    <div class="text-xs mt-1" style="color:var(--ink-faint)">${inv.line_items.length} line item${inv.line_items.length === 1 ? '' : 's'} · Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '—')}</div>
+                    <div class="text-sm mt-2" style="color:var(--ink-muted)">${U.esc(client?.name || '-')} · ${U.esc(project?.name || 'No project')}</div>
+                    <div class="text-xs mt-1" style="color:var(--ink-faint)">${inv.line_items.length} line item${inv.line_items.length === 1 ? '' : 's'} · Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '-')}</div>
                     <div class="text-xs mt-1" style="color:${statusTone === 'overdue' ? 'var(--danger)' : 'var(--ink-muted)'}">${U.esc(invoiceStatusNote(inv))}</div>
                     <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
                   </div>
@@ -2652,8 +3078,8 @@ Pages.billing = async () => {
           <button class="btn" id="new-payout-btn">${I.plus}<span>New run</span></button>
         </div>
         ${payoutRuns.length ? `<div class="divide-hair">` + payoutRuns.map(run => {
-          const statusNote = run.status === 'draft' ? 'Not queued yet — review before sending.'
-            : run.status === 'queued' ? `Queued${run.queued_at ? ' on ' + U.fmtDay(run.queued_at) : ''} — waiting for settlement.`
+          const statusNote = run.status === 'draft' ? 'Not queued yet - review before sending.'
+            : run.status === 'queued' ? `Queued${run.queued_at ? ' on ' + U.fmtDay(run.queued_at) : ''} - waiting for settlement.`
             : run.status === 'completed' ? `Completed${run.completed_at ? ' on ' + U.fmtDay(run.completed_at) : ''}.`
             : '';
           const primaryAction = run.status === 'draft'
@@ -2720,15 +3146,15 @@ function openNewInvoiceModal(prefill = {}) {
         <div>
           <label class="lbl">Client</label>
           <select class="field" name="client_id" id="inv-client">
-            <option value="">Select client…</option>
+            <option value="">Select client...</option>
             ${clients.map(c => `<option value="${c.id}" ${c.id === inferredClientId ? 'selected' : ''}>${U.esc(c.name)}</option>`).join('')}
           </select>
-          <div class="text-xs mt-1" style="color:var(--ink-muted)">Pick a client first, or choose a project and we’ll match the client for you.</div>
+          <div class="text-xs mt-1" style="color:var(--ink-muted)">Pick a client first, or choose a project and we'll match the client for you.</div>
         </div>
         <div>
           <label class="lbl">Project</label>
           <select class="field" name="project_id" id="inv-project">
-            <option value="">Select project…</option>
+            <option value="">Select project...</option>
             ${projects.map(p => `<option value="${p.id}" data-client="${p.client_id}" ${p.id === inferredProjectId ? 'selected' : ''}>${U.esc(p.name)}</option>`).join('')}
           </select>
           <div class="text-xs mt-1" id="project-help" style="color:var(--ink-muted)">Optional, but useful for portal history and shared updates.</div>
@@ -2745,7 +3171,7 @@ function openNewInvoiceModal(prefill = {}) {
         <div>
           <label class="lbl">Currency</label>
           <select class="field" name="currency">
-            ${CONFIG.currencies.map(c => `<option value="${c.code}" ${c.code === defaultCurrency ? 'selected' : ''}>${c.code} — ${c.name}</option>`).join('')}
+            ${CONFIG.currencies.map(c => `<option value="${c.code}" ${c.code === defaultCurrency ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
           </select>
         </div>
         <div>
@@ -2756,7 +3182,7 @@ function openNewInvoiceModal(prefill = {}) {
 
       <div>
         <label class="lbl" id="payment-address-label">Payment address</label>
-        <input class="field font-mono" name="payment_address" id="payment-address-field" placeholder="0x…" value="${U.esc(defaultWallet)}" />
+        <input class="field font-mono" name="payment_address" id="payment-address-field" placeholder="0x..." value="${U.esc(defaultWallet)}" />
         <div class="text-xs mt-1" id="payment-address-help" style="color:var(--ink-muted)">For on-chain rails, enter a Base wallet address. For manual, describe how your client should pay.</div>
       </div>
 
@@ -2785,7 +3211,7 @@ function openNewInvoiceModal(prefill = {}) {
 
       <div>
         <label class="lbl">Notes</label>
-        <textarea class="field" name="notes" placeholder="Any extra context…"></textarea>
+        <textarea class="field" name="notes" placeholder="Any extra context..."></textarea>
       </div>
 
       <div id="invoice-status" class="text-sm" aria-live="polite" style="color:var(--ink-muted)"></div>
@@ -2821,12 +3247,12 @@ function openNewInvoiceModal(prefill = {}) {
         if (isOnChainRail(providerEl.value)) {
           const tokenName = providerEl.value.startsWith('USDT') ? 'USDT' : 'USDC';
           labelEl.textContent = `${tokenName} wallet address (Base)`;
-          paymentField.placeholder = '0x…';
+          paymentField.placeholder = '0x...';
           paymentHelpEl.textContent = `Enter the Base wallet address where you want to receive ${tokenName}.`;
         } else {
           labelEl.textContent = 'Payment instructions';
           paymentField.placeholder = 'Reference, notes, or instructions for your client';
-          paymentHelpEl.textContent = 'Describe how your client should pay — e.g. bank details, invoice reference, or a link.';
+          paymentHelpEl.textContent = 'Describe how your client should pay - e.g. bank details, invoice reference, or a link.';
         }
       };
 
@@ -2887,7 +3313,7 @@ function openNewInvoiceModal(prefill = {}) {
         statusEl.textContent = status;
         statusEl.style.color = (!hasSelection || !hasPositiveLine || total <= 0 || (needsWallet && !hasPaymentAddress)) ? 'var(--ink-muted)' : 'var(--brand)';
         submitBtn.disabled = isSubmitting || !hasSelection || !hasPositiveLine || total <= 0 || (needsWallet && !hasPaymentAddress);
-        submitBtn.textContent = isSubmitting ? 'Creating…' : 'Create draft invoice';
+        submitBtn.textContent = isSubmitting ? 'Creating...' : 'Create draft invoice';
       };
 
       const syncClientFromProject = () => {
@@ -3124,7 +3550,7 @@ Pages.portal = async () => {
             <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
               <div class="min-w-0 flex-1">
                 <div class="font-medium">${U.esc(Projects.byId(inv.project_id)?.name || 'Project invoice')}</div>
-                <div class="text-xs mt-1" style="color:var(--ink-muted)">Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '—')} · ${inv.line_items.length} line item${inv.line_items.length === 1 ? '' : 's'}</div>
+                <div class="text-xs mt-1" style="color:var(--ink-muted)">Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '-')} · ${inv.line_items.length} line item${inv.line_items.length === 1 ? '' : 's'}</div>
                 <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
               </div>
               <div class="text-right min-w-[180px]">
@@ -3133,7 +3559,7 @@ Pages.portal = async () => {
               </div>
             </div>`).join('')}
         </div>
-      </section>` : `<section class="card p-6"><div class="font-medium">You’re all caught up.</div><div class="text-sm mt-1" style="color:var(--ink-muted)">There are no outstanding invoices right now.</div></section>`}
+      </section>` : `<section class="card p-6"><div class="font-medium">You're all caught up.</div><div class="text-sm mt-1" style="color:var(--ink-muted)">There are no outstanding invoices right now.</div></section>`}
 
       ${projects.map(project => {
         const deliverables = project.deliverables || [];
@@ -3178,7 +3604,7 @@ Pages.portal = async () => {
           return `
             <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
               <div class="min-w-0 flex-1">
-                <div class="font-medium">${U.esc(project?.name || '—')}</div>
+                <div class="font-medium">${U.esc(project?.name || '-')}</div>
                 <div class="text-xs mt-1" style="color:var(--ink-muted)">${U.fmtDay(inv.issued_at)} · ${inv.line_items.length} line item${inv.line_items.length === 1 ? '' : 's'}</div>
                 <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
               </div>
@@ -3204,7 +3630,29 @@ Pages.portal.mount = () => {
 Pages.share = async () => {
   const params = U.hashParams();
   const token = params.token || '';
-  const project = token ? Projects.portalByToken(token) : null;
+  let project = token ? Projects.portalByToken(token) : null;
+
+  // In API mode, fetch portal data from the backend if not found locally
+  if (!project && token && DataLayer.isApi()) {
+    try {
+      const portalData = await ApiClient.getPortal(token);
+      if (portalData?.project) {
+        // Inject into Store temporarily for rendering
+        project = normalizeProject(portalData.project);
+        if (portalData.client && !Clients.byId(portalData.client.id)) {
+          Store.state.clients = [...Store.state.clients, portalData.client];
+        }
+        if (portalData.invoices) {
+          const existingIds = new Set(Store.state.invoices.map(i => i.id));
+          const newInvoices = portalData.invoices.filter(i => !existingIds.has(i.id)).map(normalizeInvoice);
+          Store.state.invoices = [...Store.state.invoices, ...newInvoices];
+        }
+        if (!Projects.portalByToken(token)) {
+          Store.state.projects = [...Store.state.projects, project];
+        }
+      }
+    } catch (e) { console.warn('[Share] API portal fetch failed:', e.message); }
+  }
 
   if (!project) {
     return h`
@@ -3259,8 +3707,8 @@ Pages.share = async () => {
                   <div class="font-medium">Invoice issued ${U.fmtDay(inv.issued_at)}</div>
                   ${invoiceIsOverdue(inv) ? UI.statusChip('overdue') : ''}
                 </div>
-                <div class="text-xs mt-1" style="color:var(--ink-muted)">${inv.line_items.length} item${inv.line_items.length === 1 ? '' : 's'} · Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '—')}</div>
-                ${inv.line_items.map(li => `<div class="text-xs mt-1" style="color:var(--ink-faint)">• ${U.esc(li.description || '—')} — ${U.fmtMoney(li.amount || 0, inv.currency || 'USD')}</div>`).join('')}
+                <div class="text-xs mt-1" style="color:var(--ink-muted)">${inv.line_items.length} item${inv.line_items.length === 1 ? '' : 's'} · Due ${U.esc(inv.due_at ? U.fmtDay(inv.due_at) : '-')}</div>
+                ${inv.line_items.map(li => `<div class="text-xs mt-1" style="color:var(--ink-faint)">• ${U.esc(li.description || '-')} - ${U.fmtMoney(li.amount || 0, inv.currency || 'USD')}</div>`).join('')}
                 <div class="mt-3">${renderInvoicePaymentBlock(inv, { compact: true })}</div>
               </div>
               <div class="text-right min-w-[200px]">
@@ -3352,17 +3800,17 @@ Pages.share.mount = () => {
 
     btn.disabled = true;
     const origText = btn.innerHTML;
-    btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Connecting…</span>`;
-    showStatus('Connecting to wallet…');
+    btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Connecting...</span>`;
+    showStatus('Connecting to wallet...');
 
     try {
       if (!Crypto.isConnected()) await Crypto.connect();
-      btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Approve in wallet…</span>`;
-      showStatus('Approve the transaction in your wallet…');
+      btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Approve in wallet...</span>`;
+      showStatus('Approve the transaction in your wallet...');
 
       const hash = await Crypto.sendPayment(to, amount, token);
-      btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Confirming…</span>`;
-      showStatus(`Transaction sent. Waiting for confirmation…<br/><a href="${Crypto.txUrl(hash)}" target="_blank" class="underline" style="color:var(--brand)">View on BaseScan →</a>`);
+      btn.innerHTML = `<span class="spin inline-block w-4 h-4 rounded-full border-2" style="border-color:var(--brand-ink);border-top-color:transparent"></span><span>Confirming...</span>`;
+      showStatus(`Transaction sent. Waiting for confirmation...<br/><a href="${Crypto.txUrl(hash)}" target="_blank" class="underline" style="color:var(--brand)">View on BaseScan →</a>`);
 
       const receipt = await Crypto.waitForTx(hash);
       if (receipt.status === 'success') {
@@ -3475,13 +3923,17 @@ function renderAppShell(content, { user } = {}) {
         </nav>
 
         <div class="mt-auto p-3 border-t hairline space-y-3">
+          <div class="px-3 py-2 flex items-center gap-2 rounded-lg" style="background:${DataLayer.isApi() ? 'rgba(99,102,241,.1)' : 'var(--bg-sunken)'}">
+            <span class="text-xs font-medium" style="color:${DataLayer.isApi() ? 'var(--brand)' : 'var(--ink-faint)'}">${DataLayer.modeLabel()}</span>
+            ${DataLayer.isApi() ? `<span class="text-xs font-mono" style="color:var(--ink-faint)">${U.esc(new URL(ApiClient.baseUrl).hostname)}</span>` : ''}
+          </div>
           <div class="p-3 rounded-xl" style="background:var(--bg-sunken)">
             <div class="text-xs" style="color:var(--ink-muted)">Signed in</div>
-            <div class="font-medium mt-1">${U.esc(me?.name || '—')}</div>
+            <div class="font-medium mt-1">${U.esc(me?.name || '-')}</div>
             <div class="text-xs mt-1" style="color:var(--ink-faint)">${U.esc(me?.email || '')} · ${U.esc(me?.role || '')}</div>
             ${me?.role === 'operator'
               ? (me.wallet_address
-                  ? `<div class="text-xs font-mono mt-1 break-all" style="color:var(--ink-faint)">${U.esc(me.wallet_address.slice(0,6))}…${U.esc(me.wallet_address.slice(-4))}</div>`
+                  ? `<div class="text-xs font-mono mt-1 break-all" style="color:var(--ink-faint)">${U.esc(me.wallet_address.slice(0,6))}...${U.esc(me.wallet_address.slice(-4))}</div>`
                   : `<div class="text-xs mt-1" style="color:var(--ink-faint)">Add a wallet address in Settings</div>`)
               : (me?.client_id
                   ? `<div class="text-xs mt-1" style="color:var(--ink-faint)">${U.esc(Clients.byId(me.client_id)?.name || 'Client account')}</div>`
@@ -3500,7 +3952,7 @@ function renderAppShell(content, { user } = {}) {
               </div>
             </div>
             <div class="flex items-center gap-2 flex-wrap justify-end">
-              <select id="currency" class="field" style="max-width:110px" title="Display currency — ${U.esc(FX.sourceLabel())}">
+              <select id="currency" class="field" style="max-width:110px" title="Display currency - ${U.esc(FX.sourceLabel())}">
                 ${CONFIG.currencies.map(c => `
                   <option value="${c.code}" ${c.code===Store.state.displayCurrency?'selected':''}>${c.symbol} ${c.code}</option>
                 `).join('')}
@@ -3592,14 +4044,44 @@ function wireShell({ public: isPublic = false } = {}) {
 
 async function boot() {
   try {
-    await DB.init();
-    await Store.rehydrate();
+    // Initialize data layer - determines local vs API mode
+    DataLayer.init();
 
-    const [savedDisplayCurrency] = await DB.query(`SELECT value FROM meta WHERE key = 'display_currency'`);
-    if (!savedDisplayCurrency) {
-      const inferred = U.inferDisplayCurrency();
-      if (inferred && inferred !== CONFIG.defaultCurrency) {
-        await Store.setDisplayCurrency(inferred);
+    if (DataLayer.isApi()) {
+      // API mode: restore auth from JWT, skip PGlite
+      const jwt = localStorage.getItem('deliverport_jwt');
+      if (jwt) {
+        ApiClient.token = jwt;
+        try {
+          const me = await ApiClient.me();
+          localStorage.setItem('deliverport_auth_user_id', me.id);
+        } catch {
+          // JWT expired or invalid
+          localStorage.removeItem('deliverport_jwt');
+          localStorage.removeItem('deliverport_auth_user_id');
+        }
+      }
+      await Store.rehydrate();
+
+      // Infer display currency if not set
+      const savedCurrency = localStorage.getItem('deliverport_display_currency');
+      if (!savedCurrency) {
+        const inferred = U.inferDisplayCurrency();
+        if (inferred && inferred !== CONFIG.defaultCurrency) {
+          await Store.setDisplayCurrency(inferred);
+        }
+      }
+    } else {
+      // Local mode: full PGlite init
+      await DB.init();
+      await Store.rehydrate();
+
+      const [savedDisplayCurrency] = await DB.query(`SELECT value FROM meta WHERE key = 'display_currency'`);
+      if (!savedDisplayCurrency) {
+        const inferred = U.inferDisplayCurrency();
+        if (inferred && inferred !== CONFIG.defaultCurrency) {
+          await Store.setDisplayCurrency(inferred);
+        }
       }
     }
 
@@ -3629,14 +4111,21 @@ async function boot() {
   } catch (err) {
     console.error(err);
     const message = err?.message || String(err);
-    const recoverable = /does not exist|no such column|no such table|schema|constraint/i.test(message);
+    const recoverable = !DataLayer.isApi() && /does not exist|no such column|no such table|schema|constraint/i.test(message);
+    const isApiError = DataLayer.isApi();
     document.getElementById('boot').innerHTML = `
       <div class="max-w-md text-center p-6 space-y-4">
         <div>
-          <h2 class="h2 mb-2" style="color:var(--danger)">We couldn’t open your workspace</h2>
+          <h2 class="h2 mb-2" style="color:var(--danger)">${isApiError ? 'Cannot reach the API server' : "We couldn't open your workspace"}</h2>
           <p class="text-sm mb-4" style="color:var(--ink-muted)">${U.esc(message)}</p>
-          <p class="text-xs" style="color:var(--ink-faint)">Check the browser console for details.</p>
+          <p class="text-xs" style="color:var(--ink-faint)">${isApiError ? 'Check the API URL in your browser address bar or settings.' : 'Check the browser console for details.'}</p>
         </div>
+        ${isApiError ? `
+          <div class="flex gap-2 justify-center flex-wrap">
+            <button class="btn" id="boot-switch-local">Switch to local mode</button>
+            <button class="btn btn-primary" id="boot-retry">Retry</button>
+          </div>
+        ` : ''}
         ${recoverable ? `
           <div class="flex gap-2 justify-center flex-wrap">
             <button class="btn" id="boot-repair">Repair workspace</button>
@@ -3644,9 +4133,14 @@ async function boot() {
           </div>
         ` : ''}
       </div>`;
+    document.getElementById('boot-switch-local')?.addEventListener('click', async () => {
+      await DataLayer.setApiUrl(null);
+      location.reload();
+    });
+    document.getElementById('boot-retry')?.addEventListener('click', () => location.reload());
     document.getElementById('boot-repair')?.addEventListener('click', async () => {
       const bootEl = document.getElementById('boot');
-      bootEl.innerHTML = '<div class="max-w-md text-center p-6 text-sm" style="color:var(--ink-muted)">Repairing…</div>';
+      bootEl.innerHTML = '<div class="max-w-md text-center p-6 text-sm" style="color:var(--ink-muted)">Repairing...</div>';
       try {
         if (!DB.pg) { DB.pg = new PGlite(CONFIG.dbName); await DB.pg.waitReady; }
         await DB.repair();
@@ -3657,7 +4151,7 @@ async function boot() {
     });
     document.getElementById('boot-reset')?.addEventListener('click', async () => {
       const bootEl = document.getElementById('boot');
-      bootEl.innerHTML = '<div class="max-w-md text-center p-6 text-sm" style="color:var(--ink-muted)">Resetting…</div>';
+      bootEl.innerHTML = '<div class="max-w-md text-center p-6 text-sm" style="color:var(--ink-muted)">Resetting...</div>';
       try {
         if (!DB.pg) { DB.pg = new PGlite(CONFIG.dbName); await DB.pg.waitReady; }
         await DB.hardReset();
