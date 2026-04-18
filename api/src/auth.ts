@@ -1,4 +1,4 @@
-import { pbkdf2Sync, randomBytes } from 'crypto';
+import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
 import jwt from 'jsonwebtoken';
 
 /**
@@ -19,11 +19,30 @@ export function hashPassword(password: string): string {
 export function verifyPassword(password: string, stored: string): boolean {
   const parts = stored.split('$');
   if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
-  const iterations = parseInt(parts[1], 10);
-  const salt = Buffer.from(parts[2], 'base64');
-  const expectedHash = parts[3];
+
+  const iterations = Number.parseInt(parts[1], 10);
+  if (!Number.isFinite(iterations) || iterations <= 0) return false;
+
+  let salt: Buffer;
+  let expectedHash: Buffer;
+
+  try {
+    salt = Buffer.from(parts[2], 'base64');
+    expectedHash = Buffer.from(parts[3], 'base64');
+  } catch {
+    return false;
+  }
+
+  if (salt.length === 0 || expectedHash.length === 0) return false;
+
   const derived = pbkdf2Sync(password, salt, iterations, KEY_LENGTH, DIGEST);
-  return derived.toString('base64') === expectedHash;
+  const sameLength = derived.length === expectedHash.length;
+
+  // timingSafeEqual throws when lengths differ; compare against zero-buffer fallback to avoid that.
+  const comparableExpected = sameLength ? expectedHash : Buffer.alloc(derived.length);
+  const equal = timingSafeEqual(derived, comparableExpected);
+
+  return sameLength && equal;
 }
 
 export interface JWTPayload {

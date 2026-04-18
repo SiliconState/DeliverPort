@@ -572,6 +572,22 @@ const U = {
     });
     return `${url.pathname}${url.search}${hash}`;
   },
+  safeExternalUrl: (raw = '') => {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    const coerce = (input) => {
+      try {
+        const parsed = new URL(input);
+        return /^https?:$/i.test(parsed.protocol) ? parsed.href : '';
+      } catch {
+        return '';
+      }
+    };
+    const direct = coerce(value);
+    if (direct) return direct;
+    if (!/^[a-z]+:/i.test(value)) return coerce(`https://${value}`);
+    return '';
+  },
   bytesToBase64: (bytes) => btoa(String.fromCharCode(...Array.from(bytes || []))),
   base64ToBytes: (b64 = '') => Uint8Array.from(atob(String(b64 || '')), c => c.charCodeAt(0)),
   copyToClipboard: async (text) => {
@@ -956,6 +972,11 @@ const DB = {
 const ApiClient = {
   baseUrl: '',
   token: null,
+  _bootstrapInFlight: null,
+  _bootstrapTrailingForceRequested: false,
+  _lastBootstrapSnapshot: null,
+  _lastBootstrapFetchedAt: 0,
+  _bootstrapDebounceMs: 320,
 
   init(baseUrl) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
@@ -1022,6 +1043,10 @@ const ApiClient = {
   },
 
   clearBootstrapCache() {
+    this._lastBootstrapSnapshot = null;
+    this._lastBootstrapFetchedAt = 0;
+    this._bootstrapInFlight = null;
+    this._bootstrapTrailingForceRequested = false;
     try {
       const prefix = 'deliverport_bootstrap_cache::';
       const keys = [];
@@ -1056,7 +1081,10 @@ const ApiClient = {
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || err.message || `API error ${res.status}`);
+      const e = new Error(err.error || err.message || `API error ${res.status}`);
+      e.status = res.status;
+      e.payload = err;
+      throw e;
     }
     if (res.status === 204) return null;
     return res.json();
@@ -1066,6 +1094,36 @@ const ApiClient = {
   async post(path, body)   { return this._fetch('POST', path, body); },
   async put(path, body)    { return this._fetch('PUT', path, body); },
   async del(path)          { return this._fetch('DELETE', path); },
+
+  isMissingEndpointError(err) {
+    const status = Number(err?.status || 0);
+    if ([404, 405, 501].includes(status)) return true;
+    const message = String(err?.message || '').toLowerCase();
+    return /\b404\b|not found|cannot (get|post|put|delete)|not implemented|no route/i.test(message);
+  },
+
+  mapInvoiceReminderFromApi(item) {
+    if (!item || typeof item !== 'object') return item;
+    const invoiceRaw = item.invoice || item;
+    const invoice = invoiceRaw && (invoiceRaw.id || invoiceRaw.amount != null || invoiceRaw.total != null)
+      ? this.mapInvoiceFromApi(invoiceRaw)
+      : null;
+    const invoiceId = item.invoice_id || item.invoiceId || invoice?.id || null;
+    const dueAt = item.due_at || item.dueAt || invoice?.due_at || null;
+    const overdueFlag = item.overdue ?? item.is_overdue ?? item.isOverdue;
+    const isOverdue = overdueFlag != null
+      ? !!overdueFlag
+      : (dueAt ? Date.parse(dueAt) < Date.now() : false);
+    return {
+      ...item,
+      invoice,
+      invoice_id: invoiceId,
+      due_at: dueAt,
+      is_overdue: isOverdue,
+      last_reminded_at: item.last_reminded_at || item.lastReminderAt || item.reminded_at || null,
+      reason: item.reason || item.kind || (isOverdue ? 'Overdue reminder candidate' : 'Due reminder candidate'),
+    };
+  },
 
   mapInvoiceFromApi(inv) {
     if (!inv || typeof inv !== 'object') return inv;
@@ -1144,18 +1202,53 @@ const ApiClient = {
   },
 
   // ── Bootstrap (single startup payload) ──
-  async getBootstrap() {
-    const r = await this.get('/api/bootstrap');
-    const invoices = Array.isArray(r.invoices) ? r.invoices.map(inv => this.mapInvoiceFromApi(inv)) : [];
-    const payoutRunsRaw = r.payout_runs || r.payoutRuns || [];
-    const payoutRuns = Array.isArray(payoutRunsRaw)
-      ? payoutRunsRaw.map(run => this.mapPayoutRunFromApi(run))
-      : [];
-    return {
-      ...r,
-      invoices,
-      payoutRuns,
+  async getBootstrap(opts = {}) {
+    const requestForce = !!(opts && opts.force);
+    const now = Date.now();
+
+    if (this._bootstrapInFlight) {
+      if (requestForce) this._bootstrapTrailingForceRequested = true;
+      return this._bootstrapInFlight;
+    }
+
+    if (!requestForce && this._lastBootstrapSnapshot && (now - this._lastBootstrapFetchedAt) < this._bootstrapDebounceMs) {
+      return this._lastBootstrapSnapshot;
+    }
+
+    const fetchBootstrap = async () => {
+      const r = await this.get('/api/bootstrap');
+      const invoices = Array.isArray(r.invoices) ? r.invoices.map(inv => this.mapInvoiceFromApi(inv)) : [];
+      const payoutRunsRaw = r.payout_runs || r.payoutRuns || [];
+      const payoutRuns = Array.isArray(payoutRunsRaw)
+        ? payoutRunsRaw.map(run => this.mapPayoutRunFromApi(run))
+        : [];
+      const payload = {
+        ...r,
+        invoices,
+        payoutRuns,
+      };
+      this._lastBootstrapSnapshot = payload;
+      this._lastBootstrapFetchedAt = Date.now();
+      return payload;
     };
+
+    this._bootstrapTrailingForceRequested = false;
+    const request = (async () => {
+      let payload = await fetchBootstrap();
+      while (this._bootstrapTrailingForceRequested) {
+        this._bootstrapTrailingForceRequested = false;
+        payload = await fetchBootstrap();
+      }
+      return payload;
+    })();
+
+    this._bootstrapInFlight = request;
+    try {
+      return await request;
+    } finally {
+      if (this._bootstrapInFlight === request) this._bootstrapInFlight = null;
+      this._bootstrapTrailingForceRequested = false;
+    }
   },
 
   // ── Clients ──
@@ -1169,6 +1262,22 @@ const ApiClient = {
   async createProject(data)         { const r = await this.post('/api/projects', data); return r.project || r; },
   async updateProject(id, data)     { const r = await this.put(`/api/projects/${id}`, data); return r.project || r; },
   async deleteProject(id)           { return this.del(`/api/projects/${id}`); },
+  async submitDeliverableApproval(projectId, deliverableId, payload = {}) {
+    const cleanPayload = {
+      decision: payload.decision || payload.status || 'approved',
+      status: payload.status || payload.decision || 'approved',
+      note: String(payload.note || '').trim() || null,
+    };
+    try {
+      return await this.post(
+        `/api/projects/${encodeURIComponent(projectId)}/deliverables/${encodeURIComponent(deliverableId)}/approval`,
+        cleanPayload,
+      );
+    } catch (err) {
+      if (this.isMissingEndpointError(err)) return { unsupported: true };
+      throw err;
+    }
+  },
 
   // ── Invoices ──
   async getInvoices() {
@@ -1188,6 +1297,35 @@ const ApiClient = {
     return this.mapInvoiceFromApi(r.invoice || r);
   },
   async deleteInvoice(id)           { return this.del(`/api/invoices/${id}`); },
+  async reconcileInvoice(id) {
+    try {
+      return await this.post(`/api/invoices/${encodeURIComponent(id)}/reconcile`, {});
+    } catch (err) {
+      if (this.isMissingEndpointError(err)) return { unsupported: true };
+      throw err;
+    }
+  },
+  async getInvoiceReminders() {
+    try {
+      const r = await this.get('/api/invoices/reminders');
+      const rows = r?.reminders || r?.items || r;
+      return {
+        unsupported: false,
+        reminders: Array.isArray(rows) ? rows.map(item => this.mapInvoiceReminderFromApi(item)) : [],
+      };
+    } catch (err) {
+      if (this.isMissingEndpointError(err)) return { unsupported: true, reminders: [] };
+      throw err;
+    }
+  },
+  async markInvoiceReminderSent(id, payload = {}) {
+    try {
+      return await this.post(`/api/invoices/${encodeURIComponent(id)}/remind`, payload || {});
+    } catch (err) {
+      if (this.isMissingEndpointError(err)) return { unsupported: true };
+      throw err;
+    }
+  },
 
   // ── Payout Runs ──
   async getPayoutRuns() {
@@ -1215,6 +1353,18 @@ const ApiClient = {
   async getMeta()                   { const r = await this.get('/api/meta'); return r.meta || r; },
   async setMeta(key, value)         { return this.put(`/api/meta/${encodeURIComponent(key)}`, { value }); },
   async deleteMeta(keys)            { return this.post('/api/meta/delete', { keys }); },
+
+  // ── Audit / Ops ──
+  async getAuditEvents() {
+    try {
+      const r = await this.get('/api/audit-events');
+      const rows = r?.events || r?.audit_events || r;
+      return { unsupported: false, events: Array.isArray(rows) ? rows : [] };
+    } catch (err) {
+      if (this.isMissingEndpointError(err)) return { unsupported: true, events: [] };
+      throw err;
+    }
+  },
 
   // ── Portal (public, no auth) ──
   async getPortal(token) {
@@ -1420,9 +1570,65 @@ const Store = {
     meta: {},
   },
   subs: new Set(),
+  _rehydrateInFlight: null,
+  _rehydratePhase: 'idle',
+  _rehydrateTrailingRequested: false,
+  _rehydrateTrailingOpts: { preferBootstrapCache: false, force: false },
+  _lastApiRehydrateAt: 0,
+  _rehydrateDebounceMs: 140,
+
+  _mergeRehydrateOpts(next = {}, prev = {}) {
+    return {
+      preferBootstrapCache: !!(next.preferBootstrapCache || prev.preferBootstrapCache),
+      force: !!(next.force || prev.force),
+    };
+  },
 
   async rehydrate(opts = {}) {
-    const { preferBootstrapCache = false } = opts || {};
+    const requestOpts = this._mergeRehydrateOpts(opts || {}, {});
+
+    if (this._rehydrateInFlight) {
+      this._rehydrateTrailingRequested = true;
+      this._rehydrateTrailingOpts = this._mergeRehydrateOpts(requestOpts, this._rehydrateTrailingOpts);
+      return this._rehydrateInFlight;
+    }
+
+    if (DataLayer.isApi() && !requestOpts.force && requestOpts.preferBootstrapCache) {
+      const sinceLast = Date.now() - Number(this._lastApiRehydrateAt || 0);
+      if (sinceLast >= 0 && sinceLast < this._rehydrateDebounceMs) return;
+    }
+
+    this._rehydrateInFlight = (async () => {
+      let nextOpts = requestOpts;
+      let pass = 0;
+
+      while (nextOpts) {
+        this._rehydratePhase = pass === 0 ? 'leading' : 'trailing';
+        this._rehydrateTrailingRequested = false;
+        this._rehydrateTrailingOpts = { preferBootstrapCache: false, force: false };
+
+        await this._rehydrateOnce(nextOpts);
+
+        if (this._rehydrateTrailingRequested) {
+          nextOpts = this._mergeRehydrateOpts(this._rehydrateTrailingOpts, {});
+          pass += 1;
+        } else {
+          nextOpts = null;
+        }
+      }
+    })().finally(() => {
+      this._rehydrateInFlight = null;
+      this._rehydratePhase = 'idle';
+      this._rehydrateTrailingRequested = false;
+      this._rehydrateTrailingOpts = { preferBootstrapCache: false, force: false };
+      if (DataLayer.isApi()) this._lastApiRehydrateAt = Date.now();
+    });
+
+    return this._rehydrateInFlight;
+  },
+
+  async _rehydrateOnce(opts = {}) {
+    const { preferBootstrapCache = false, force = false } = opts || {};
 
     if (DataLayer.isApi()) {
       const localTheme = localStorage.getItem('deliverport_theme');
@@ -1485,7 +1691,7 @@ const Store = {
       try {
         let snapshot;
         try {
-          snapshot = await ApiClient.getBootstrap();
+          snapshot = await ApiClient.getBootstrap({ force });
         } catch (bootstrapErr) {
           const message = String(bootstrapErr?.message || '');
           const sessionError = /session expired|401/i.test(message);
@@ -1551,7 +1757,7 @@ const Store = {
     } else {
       await DB.query(`INSERT INTO meta(key,value) VALUES ('current_user', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(id)]);
     }
-    await this.rehydrate();
+    await this.rehydrate({ force: true });
   },
   async setAuthUser(id) {
     const startedAt = new Date().toISOString();
@@ -1572,7 +1778,7 @@ const Store = {
     } else {
       await DB.exec(`DELETE FROM meta WHERE key IN ('auth_user_id','current_user','auth_started_at')`);
     }
-    await this.rehydrate();
+    await this.rehydrate({ force: true });
   },
   async setTheme(theme) {
     if (DataLayer.isApi()) {
@@ -1603,12 +1809,60 @@ const Store = {
   },
 };
 
+function normalizeDeliverableAttachment(att, idx = 0) {
+  if (typeof att === 'string') {
+    const url = U.safeExternalUrl(att);
+    if (!url) return null;
+    return { label: `Attachment ${idx + 1}`, url };
+  }
+  if (!att || typeof att !== 'object') return null;
+  const url = U.safeExternalUrl(att.url || att.href || '');
+  if (!url) return null;
+  const explicitLabel = String(att.label || att.name || '').trim();
+  let fallbackLabel = `Attachment ${idx + 1}`;
+  try {
+    fallbackLabel = new URL(url).hostname.replace(/^www\./, '') || fallbackLabel;
+  } catch {
+    // no-op fallback
+  }
+  return { label: explicitLabel || fallbackLabel, url };
+}
+
+function normalizeDeliverable(d, idx = 0) {
+  const raw = (d && typeof d === 'object') ? d : { name: String(d || '') };
+  let attachments = raw.attachments ?? raw.links ?? [];
+  if (typeof attachments === 'string') {
+    try { attachments = JSON.parse(attachments); } catch { attachments = []; }
+  }
+  const normalizedAttachments = Array.isArray(attachments)
+    ? attachments.map((att, attIdx) => normalizeDeliverableAttachment(att, attIdx)).filter(Boolean)
+    : [];
+  const rawApproval = String(
+    raw.approval_status ?? raw.approvalStatus ?? raw.client_approval_status ?? raw.approval?.status ?? ''
+  ).toLowerCase();
+  const approvalStatus = ['approved', 'rejected', 'pending'].includes(rawApproval) ? rawApproval : null;
+  return {
+    ...raw,
+    id: raw.id || raw.deliverable_id || raw.deliverableId || `del_${idx + 1}`,
+    name: String(raw.name || raw.title || '').trim() || `Deliverable ${idx + 1}`,
+    status: raw.status || 'pending',
+    note: raw.note || raw.description || '',
+    attachments: normalizedAttachments,
+    approval_status: approvalStatus,
+    approval_note: raw.approval_note || raw.approvalNote || raw.approval?.note || '',
+    approved_at: raw.approved_at || raw.approval?.at || null,
+  };
+}
+
 function normalizeProject(p) {
   let deliverables = p.deliverables;
   if (typeof deliverables === 'string') {
     try { deliverables = JSON.parse(deliverables); } catch { deliverables = []; }
   }
-  return { ...p, deliverables: Array.isArray(deliverables) ? deliverables : [] };
+  const normalizedDeliverables = Array.isArray(deliverables)
+    ? deliverables.map((d, idx) => normalizeDeliverable(d, idx))
+    : [];
+  return { ...p, deliverables: normalizedDeliverables };
 }
 
 function normalizeInvoice(i) {
@@ -1708,7 +1962,6 @@ const Auth = {
     if (DataLayer.isApi()) {
       const user = await ApiClient.signIn(email, password);
       await Store.setAuthUser(user.id);
-      await Store.rehydrate();
       return Users.byId(user.id) || user;
     }
     // Local mode
@@ -1726,7 +1979,6 @@ const Auth = {
     if (DataLayer.isApi()) {
       const user = await ApiClient.register({ name, email, password, role, wallet_address });
       await Store.setAuthUser(user.id);
-      await Store.rehydrate();
       return Users.byId(user.id) || user;
     }
     // Local mode
@@ -1896,6 +2148,15 @@ const Projects = {
     await DB.query(`UPDATE projects SET deliverables=$2::jsonb WHERE id=$1`, [id, JSON.stringify(deliverables)]);
     await Store.rehydrate();
   },
+
+  async submitDeliverableApproval(projectId, deliverableId, payload = {}) {
+    if (!DataLayer.isApi()) throw new Error('Deliverable approvals are available in API mode.');
+    if (!projectId || !deliverableId) throw new Error('This deliverable cannot be reviewed yet.');
+    const result = await ApiClient.submitDeliverableApproval(projectId, deliverableId, payload);
+    if (result?.unsupported) throw new Error('Deliverable approvals are not enabled on this API yet.');
+    await Store.rehydrate({ force: true });
+    return result;
+  },
 };
 
 const Revenue = {
@@ -2003,6 +2264,68 @@ const Revenue = {
     );
     await Store.rehydrate();
   },
+
+  async reconcileInvoice(id) {
+    if (!DataLayer.isApi()) return { unsupported: true, reason: 'local_mode' };
+    if (!id) throw new Error('Missing invoice id');
+    const result = await ApiClient.reconcileInvoice(id);
+    if (result?.unsupported) return result;
+    await Store.rehydrate({ force: true });
+    return { unsupported: false, ...(result || {}) };
+  },
+
+  async getReminderCandidates() {
+    const fallbackReminders = Store.state.invoices
+      .filter(inv => inv.status === 'sent')
+      .map(inv => {
+        const dueAt = inv.due_at || null;
+        const dueMs = dueAt ? Date.parse(dueAt) : NaN;
+        const isOverdue = Number.isFinite(dueMs) ? dueMs < Date.now() : false;
+        const isDueSoon = Number.isFinite(dueMs) ? (dueMs - Date.now()) <= (3 * 24 * 3600 * 1000) : false;
+        if (!isOverdue && !isDueSoon) return null;
+        return {
+          invoice_id: inv.id,
+          invoice: inv,
+          due_at: dueAt,
+          is_overdue: isOverdue,
+          reason: isOverdue ? 'Overdue reminder candidate' : 'Due reminder candidate',
+          source: 'fallback',
+        };
+      })
+      .filter(Boolean);
+
+    if (!DataLayer.isApi()) return { unsupported: true, reason: 'local_mode', reminders: fallbackReminders };
+
+    const result = await ApiClient.getInvoiceReminders();
+    if (result?.unsupported) return { ...result, reminders: fallbackReminders };
+    const reminders = Array.isArray(result?.reminders) ? result.reminders : [];
+    const mapped = reminders.map((item) => {
+      const invoiceId = item?.invoice_id || item?.invoiceId || item?.invoice?.id || item?.id || null;
+      const invoice = item?.invoice || (invoiceId ? Store.state.invoices.find(inv => inv.id === invoiceId) : null) || null;
+      return {
+        ...item,
+        invoice_id: invoiceId,
+        invoice,
+        due_at: item?.due_at || item?.dueAt || invoice?.due_at || null,
+        is_overdue: item?.is_overdue ?? item?.overdue ?? (invoice ? invoiceIsOverdue(invoice) : false),
+        source: 'api',
+      };
+    }).filter(item => item.invoice_id && item.invoice);
+
+    return {
+      unsupported: false,
+      reminders: mapped.length ? mapped : fallbackReminders,
+    };
+  },
+
+  async markReminderSent(id, payload = {}) {
+    if (!DataLayer.isApi()) return { unsupported: true, reason: 'local_mode' };
+    if (!id) throw new Error('Missing invoice id');
+    const result = await ApiClient.markInvoiceReminderSent(id, payload);
+    if (result?.unsupported) return result;
+    await Store.rehydrate({ force: true });
+    return { unsupported: false, ...(result || {}) };
+  },
 };
 
 /* ══════════════════════════════════════ 11. COMPONENTS ══════════════════════════════════════ */
@@ -2082,6 +2405,8 @@ const UI = {
       delivered:   { cls:'chip-moss',   label:'Delivered' },
       in_progress: { cls:'chip-indigo', label:'In progress' },
       pending:     { cls:'chip-amber',  label:'Pending' },
+      approved:    { cls:'chip-moss',   label:'Approved' },
+      rejected:    { cls:'chip-danger', label:'Changes requested' },
     };
     const m = map[status] || { cls:'', label: status || '-' };
     return `<span class="chip ${m.cls}"><span class="chip-dot"></span>${m.label}</span>`;
@@ -2201,6 +2526,86 @@ function invoiceStatusNote(inv) {
   if (inv.status === 'sent') return inv.due_at ? `Awaiting payment by ${U.fmtDay(inv.due_at)}.` : 'Sent to client and awaiting payment.';
   if (inv.status === 'paid') return inv.paid_at ? `Paid ${U.fmtDay(inv.paid_at)}.` : 'Payment recorded.';
   return '';
+}
+
+function deliverableApprovalStatus(deliverable) {
+  const raw = String(
+    deliverable?.approval_status
+    ?? deliverable?.approvalStatus
+    ?? deliverable?.client_approval_status
+    ?? deliverable?.approval?.status
+    ?? (deliverable?.approved === true ? 'approved' : deliverable?.rejected === true ? 'rejected' : '')
+  ).toLowerCase();
+  if (['approved', 'rejected', 'pending'].includes(raw)) return raw;
+  if (raw === 'approve' || raw === 'accepted') return 'approved';
+  if (raw === 'reject' || raw === 'changes_requested' || raw === 'needs_changes') return 'rejected';
+  return '';
+}
+
+function deliverableApprovalMeta(deliverable) {
+  const status = deliverableApprovalStatus(deliverable);
+  const note = String(
+    deliverable?.approval_note
+    ?? deliverable?.approvalNote
+    ?? deliverable?.approval?.note
+    ?? ''
+  ).trim();
+  const at = deliverable?.approved_at
+    || deliverable?.approval_at
+    || deliverable?.approval?.at
+    || deliverable?.approval?.updated_at
+    || deliverable?.approval?.created_at
+    || null;
+  const by = String(
+    deliverable?.approval?.by
+    ?? deliverable?.approval?.actor
+    ?? deliverable?.approval?.actor_name
+    ?? deliverable?.approved_by
+    ?? ''
+  ).trim();
+  if (!status && !note && !at && !by) return null;
+  return { status: status || 'pending', note, at, by };
+}
+
+function renderDeliverableApprovalBadge(deliverable, { showPending = false } = {}) {
+  const status = deliverableApprovalStatus(deliverable);
+  if (status === 'approved') return UI.statusChip('approved');
+  if (status === 'rejected') return UI.statusChip('rejected');
+  if (showPending && String(deliverable?.status || '') === 'delivered') return UI.statusChip('pending');
+  return '';
+}
+
+function renderDeliverableApprovalNote(deliverable) {
+  const approval = deliverableApprovalMeta(deliverable);
+  if (!approval) return '';
+  const label = approval.status === 'approved'
+    ? 'Client approved'
+    : approval.status === 'rejected'
+      ? 'Client requested changes'
+      : 'Awaiting client decision';
+  const detail = [label, approval.at ? U.fmtDay(approval.at) : '', approval.by ? `by ${approval.by}` : '']
+    .filter(Boolean)
+    .join(' · ');
+  return `<div class="text-xs mt-1" style="color:var(--ink-faint)">${U.esc(detail)}</div>${approval.note ? `<div class="text-xs mt-1" style="color:var(--ink-muted)">“${U.esc(approval.note)}”</div>` : ''}`;
+}
+
+function renderDeliverableAttachmentLinks(deliverable, { compact = false } = {}) {
+  const attachments = Array.isArray(deliverable?.attachments) ? deliverable.attachments : [];
+  const links = attachments.map((item, idx) => {
+    const href = U.safeExternalUrl(item?.url || item?.href || '');
+    if (!href) return '';
+    const label = String(item?.label || item?.name || '').trim() || `Attachment ${idx + 1}`;
+    return `<a href="${U.esc(href)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs" style="color:var(--brand)">${I.link}<span>${U.esc(label)}</span></a>`;
+  }).filter(Boolean);
+  if (!links.length) return '';
+  return `<div class="${compact ? 'mt-2' : 'mt-3'} space-y-1">${links.join('')}</div>`;
+}
+
+function formatAuditEventLabel(event) {
+  const action = String(event?.action || event?.event_type || event?.event || event?.type || 'event')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  return action ? action.replace(/^./, ch => ch.toUpperCase()) : 'Event';
 }
 
 function renderInvoicePrimaryAction(inv) {
@@ -2625,6 +3030,16 @@ Pages.dashboard = async () => {
   const steps = onboardingSteps({ me, clients, projects, invoices });
   const completedSteps = steps.filter(step => step.done).length;
 
+  let auditFeed = { unsupported: !DataLayer.isApi(), events: [], error: '' };
+  if (DataLayer.isApi()) {
+    try {
+      auditFeed = await ApiClient.getAuditEvents();
+    } catch (err) {
+      auditFeed = { unsupported: false, events: [], error: err.message || String(err) };
+    }
+  }
+  const auditEvents = Array.isArray(auditFeed.events) ? auditFeed.events.slice(0, 10) : [];
+
   return h`
     <div class="p-6 md:p-10 space-y-8 anim-in">
       <header class="flex items-end justify-between flex-wrap gap-4">
@@ -2717,6 +3132,40 @@ Pages.dashboard = async () => {
           </div>
         </div>
         ${clients.length ? renderClientRows(clients, { limit: 4 }) : UI.emptyState(I.users, 'No clients yet', 'Add your first client before you create a project or invoice.', `<button class="btn btn-primary" id="new-client-empty">${I.plus}<span>New client</span></button>`)}
+      </section>
+
+      <section class="card p-6 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div class="eyebrow">Audit timeline</div>
+            <h2 class="h2">Recent operator events</h2>
+            <div class="text-sm mt-1" style="color:var(--ink-muted)">A lightweight backend feed of key workspace actions.</div>
+          </div>
+          ${DataLayer.isApi() ? `<span class="chip chip-indigo"><span class="chip-dot"></span>Live API</span>` : `<span class="chip"><span class="chip-dot"></span>Local mode</span>`}
+        </div>
+        ${!DataLayer.isApi()
+          ? `<div class="text-sm" style="color:var(--ink-muted)">Connect an API backend to surface audit history.</div>`
+          : auditFeed.error
+            ? `<div class="text-sm" style="color:var(--danger)">Could not load audit events: ${U.esc(auditFeed.error)}</div>`
+            : auditFeed.unsupported
+              ? `<div class="text-sm" style="color:var(--ink-muted)">This backend does not expose <span class="font-mono text-xs">/api/audit-events</span> yet.</div>`
+              : auditEvents.length
+                ? `<div class="divide-hair">${auditEvents.map((event, idx) => {
+                    const actor = event.actor_name || event.actor?.name || event.user_name || event.user?.name || event.actor_id || event.actor_user_id || event.user_id || 'System';
+                    const happenedAt = event.created_at || event.timestamp || event.occurred_at || event.at;
+                    const summary = event.summary || event.message || event.description || '';
+                    return `
+                      <div class="py-3 flex items-start justify-between gap-3 flex-wrap">
+                        <div class="min-w-0 flex-1">
+                          <div class="font-medium">${U.esc(formatAuditEventLabel(event))}</div>
+                          <div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(actor)}${summary ? ` · ${U.esc(summary)}` : ''}</div>
+                        </div>
+                        <div class="text-right min-w-[130px]">
+                          <div class="text-xs font-mono" style="color:var(--ink-faint)">${U.esc(happenedAt ? U.fmtDate(happenedAt) : `#${idx + 1}`)}</div>
+                        </div>
+                      </div>`;
+                  }).join('')}</div>`
+                : `<div class="text-sm" style="color:var(--ink-muted)">No audit events yet.</div>`}
       </section>
     </div>
   `;
@@ -2859,6 +3308,40 @@ function openEditProjectModal(projectId) {
   if (!project) return;
   const deliverables = project.deliverables || [];
   const shareHref = U.href(U.setHashParams('#/share', { token: project.portal_token }), { demo: APP.demo });
+
+  const renderAttachmentRow = (attachment = {}) => `
+    <div class="grid grid-cols-[1fr_1fr_auto] gap-2 items-end" data-attachment-row>
+      <input class="field" data-attachment-label value="${U.esc(attachment.label || '')}" placeholder="Label (optional)" />
+      <input class="field" data-attachment-url value="${U.esc(attachment.url || '')}" placeholder="https://..." />
+      <button type="button" class="btn btn-ghost text-xs" data-remove-attachment>${I.x}<span class="hidden sm:inline">Remove</span></button>
+    </div>`;
+
+  const renderDeliverableCard = (deliverable = {}, idx = 0) => {
+    const attachments = Array.isArray(deliverable.attachments) ? deliverable.attachments : [];
+    return `
+      <div class="card-flat p-3 space-y-3" data-del-idx="${idx}">
+        <input type="hidden" name="del_id_${idx}" value="${U.esc(deliverable.id || `del_${idx + 1}`)}" />
+        <div class="grid grid-cols-[1fr_auto] gap-2">
+          <input class="field" name="del_name_${idx}" value="${U.esc(deliverable.name || '')}" placeholder="Deliverable name" />
+          <select class="field" name="del_status_${idx}" style="max-width:140px">
+            <option value="pending" ${deliverable.status==='pending'?'selected':''}>Pending</option>
+            <option value="in_progress" ${deliverable.status==='in_progress'?'selected':''}>In progress</option>
+            <option value="delivered" ${deliverable.status==='delivered'?'selected':''}>Delivered</option>
+          </select>
+        </div>
+        <input class="field" name="del_note_${idx}" value="${U.esc(deliverable.note || '')}" placeholder="Notes (optional)" />
+        <div class="card-flat p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="text-xs uppercase tracking-wider" style="color:var(--ink-faint)">Attachment links</div>
+            <button type="button" class="btn btn-ghost text-xs" data-add-attachment="${idx}">${I.plus} Add link</button>
+          </div>
+          <div class="space-y-2" data-attachments-for="${idx}">
+            ${attachments.length ? attachments.map(att => renderAttachmentRow(att)).join('') : `<div class="text-xs" style="color:var(--ink-faint)" data-empty-attachments>No attachment links yet.</div>`}
+          </div>
+        </div>
+      </div>`;
+  };
+
   Modal.open('Edit project', h`
     <form id="modal-form" class="space-y-4">
       <div class="card-flat p-3 flex items-center justify-between gap-3 flex-wrap">
@@ -2891,19 +3374,7 @@ function openEditProjectModal(projectId) {
           <button type="button" class="btn btn-ghost text-xs" id="add-deliverable">${I.plus} Add</button>
         </div>
         <div id="deliverables-list" class="space-y-2">
-          ${deliverables.map((d, i) => `
-            <div class="card-flat p-3 space-y-2" data-del-idx="${i}">
-              <div class="grid grid-cols-[1fr_auto] gap-2">
-                <input class="field" name="del_name_${i}" value="${U.esc(d.name)}" placeholder="Deliverable name" />
-                <select class="field" name="del_status_${i}" style="max-width:140px">
-                  <option value="pending" ${d.status==='pending'?'selected':''}>Pending</option>
-                  <option value="in_progress" ${d.status==='in_progress'?'selected':''}>In progress</option>
-                  <option value="delivered" ${d.status==='delivered'?'selected':''}>Delivered</option>
-                </select>
-              </div>
-              <input class="field" name="del_note_${i}" value="${U.esc(d.note || '')}" placeholder="Notes (optional)" />
-            </div>
-          `).join('')}
+          ${deliverables.map((d, i) => renderDeliverableCard(d, i)).join('')}
         </div>
       </div>
       <div class="flex justify-end gap-2">
@@ -2914,34 +3385,85 @@ function openEditProjectModal(projectId) {
   `, {
     onMount: (root) => {
       let delCount = deliverables.length;
+      const list = root.querySelector('#deliverables-list');
+      const emptyAttachmentHint = `<div class="text-xs" style="color:var(--ink-faint)" data-empty-attachments>No attachment links yet.</div>`;
+
+      const clearAttachmentHint = (container) => {
+        container?.querySelector('[data-empty-attachments]')?.remove();
+      };
+
+      const ensureAttachmentHint = (container) => {
+        if (!container) return;
+        if (container.querySelector('[data-attachment-row]')) return;
+        if (container.querySelector('[data-empty-attachments]')) return;
+        container.insertAdjacentHTML('beforeend', emptyAttachmentHint);
+      };
+
       root.querySelector('[data-copy]')?.addEventListener('click', async () => {
         await U.copyToClipboard(location.origin + shareHref);
         Toast.show('Share link copied');
       });
+
       root.querySelector('#add-deliverable').addEventListener('click', () => {
-        const list = root.querySelector('#deliverables-list');
         const idx = delCount++;
-        list.insertAdjacentHTML('beforeend', `
-          <div class="card-flat p-3 space-y-2" data-del-idx="${idx}">
-            <div class="grid grid-cols-[1fr_auto] gap-2">
-              <input class="field" name="del_name_${idx}" placeholder="Deliverable name" />
-              <select class="field" name="del_status_${idx}" style="max-width:140px">
-                <option value="pending">Pending</option>
-                <option value="in_progress">In progress</option>
-                <option value="delivered">Delivered</option>
-              </select>
-            </div>
-            <input class="field" name="del_note_${idx}" placeholder="Notes (optional)" />
-          </div>`);
+        list.insertAdjacentHTML('beforeend', renderDeliverableCard({ id: U.uid('del'), status: 'pending', note: '', attachments: [] }, idx));
       });
+
+      list.addEventListener('click', (event) => {
+        const addBtn = event.target.closest('[data-add-attachment]');
+        if (addBtn) {
+          const idx = addBtn.dataset.addAttachment;
+          const container = list.querySelector(`[data-attachments-for="${idx}"]`);
+          if (!container) return;
+          clearAttachmentHint(container);
+          container.insertAdjacentHTML('beforeend', renderAttachmentRow());
+          return;
+        }
+
+        const removeBtn = event.target.closest('[data-remove-attachment]');
+        if (removeBtn) {
+          const row = removeBtn.closest('[data-attachment-row]');
+          const container = removeBtn.closest('[data-attachments-for]');
+          row?.remove();
+          ensureAttachmentHint(container);
+        }
+      });
+
       root.querySelector('#modal-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
+        const existingById = new Map((deliverables || []).map(d => [String(d.id || ''), d]));
         const newDeliverables = [];
         for (let i = 0; i < delCount; i++) {
           const name = String(fd.get(`del_name_${i}`) || '').trim();
           if (!name) continue;
-          newDeliverables.push({ name, status: fd.get(`del_status_${i}`) || 'pending', note: fd.get(`del_note_${i}`) || '' });
+          const deliverableId = String(fd.get(`del_id_${i}`) || U.uid('del'));
+          const previous = existingById.get(deliverableId) || null;
+          const card = root.querySelector(`[data-del-idx="${i}"]`);
+          const attachments = [];
+          card?.querySelectorAll('[data-attachment-row]').forEach((row, attIdx) => {
+            const label = String(row.querySelector('[data-attachment-label]')?.value || '').trim();
+            const rawUrl = String(row.querySelector('[data-attachment-url]')?.value || '').trim();
+            const url = U.safeExternalUrl(rawUrl);
+            if (!url) return;
+            let fallbackLabel = `Attachment ${attIdx + 1}`;
+            try {
+              fallbackLabel = new URL(url).hostname.replace(/^www\./, '') || fallbackLabel;
+            } catch {
+              // fallback stays as-is
+            }
+            attachments.push({ label: label || fallbackLabel, url });
+          });
+
+          const nextDeliverable = {
+            ...(previous || {}),
+            id: deliverableId,
+            name,
+            status: fd.get(`del_status_${i}`) || 'pending',
+            note: fd.get(`del_note_${i}`) || '',
+            attachments,
+          };
+          newDeliverables.push(nextDeliverable);
         }
         try {
           await Projects.update(projectId, {
@@ -3274,6 +3796,41 @@ Pages.billing = async () => {
       ? UI.emptyState(I.money, 'No invoices yet', 'You have a client ready. Create a project so invoice history stays attached to deliverables and the client portal.', `<a class="btn btn-primary" href="#/projects">${I.plus}<span>Create project</span></a>`)
       : UI.emptyState(I.money, 'No invoices yet', 'Your workspace is ready. Start with a draft invoice, review the payment details, then mark it sent when you are ready.', `<button class="btn btn-primary" id="new-invoice-btn-empty">${I.plus}<span>Create first draft</span></button>`);
 
+  let reminderFeed = { unsupported: !DataLayer.isApi(), reminders: [], reason: DataLayer.isApi() ? '' : 'local_mode', error: '' };
+  try {
+    reminderFeed = await Revenue.getReminderCandidates();
+  } catch (err) {
+    reminderFeed = { unsupported: false, reminders: [], reason: 'error', error: err.message || String(err) };
+  }
+
+  const invoiceById = new Map(invoices.map(inv => [inv.id, inv]));
+  const seenReminderIds = new Set();
+  const reminderCandidates = (Array.isArray(reminderFeed.reminders) ? reminderFeed.reminders : [])
+    .map((item, idx) => {
+      const inlineInvoice = item?.invoice ? normalizeInvoice(item.invoice)
+        : ((item?.client_id || item?.project_id || item?.amount != null) ? normalizeInvoice(item) : null);
+      const invoiceId = item?.invoice_id || item?.invoiceId || inlineInvoice?.id || item?.id || null;
+      const invoice = inlineInvoice || (invoiceId ? invoiceById.get(invoiceId) : null);
+      if (!invoice || seenReminderIds.has(invoice.id)) return null;
+      seenReminderIds.add(invoice.id);
+      const dueAt = item?.due_at || item?.dueAt || invoice.due_at || null;
+      const overdueFlag = item?.is_overdue ?? item?.isOverdue ?? item?.overdue;
+      const isOverdue = overdueFlag != null ? !!overdueFlag : (dueAt ? Date.parse(dueAt) < Date.now() : false);
+      return {
+        key: `${invoice.id}_${idx}`,
+        invoice,
+        dueAt,
+        isOverdue,
+        reason: item?.reason || item?.kind || (isOverdue ? 'Overdue reminder candidate.' : 'Due reminder candidate.'),
+        lastRemindedAt: item?.last_reminded_at || item?.lastReminderAt || item?.reminded_at || null,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+      return Date.parse(a.dueAt || 0) - Date.parse(b.dueAt || 0);
+    });
+
   return h`
     <div class="p-6 md:p-10 space-y-8 anim-in">
       <header class="flex items-end justify-between flex-wrap gap-4">
@@ -3308,6 +3865,49 @@ Pages.billing = async () => {
       <section class="card p-6 space-y-4">
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div>
+            <div class="eyebrow">Reminders</div>
+            <h2 class="h2">Due + overdue follow-ups</h2>
+            <div class="text-sm mt-1" style="color:var(--ink-muted)">Review reminder candidates and mark outreach events as sent.</div>
+          </div>
+          ${DataLayer.isApi() ? `<span class="chip chip-indigo"><span class="chip-dot"></span>API assist</span>` : `<span class="chip"><span class="chip-dot"></span>Local mode</span>`}
+        </div>
+        ${reminderFeed.error
+          ? `<div class="text-sm" style="color:var(--danger)">Could not load reminders: ${U.esc(reminderFeed.error)}</div>`
+          : reminderCandidates.length
+            ? `<div class="divide-hair">${reminderCandidates.map(reminder => {
+                const inv = reminder.invoice;
+                const client = Clients.byId(inv.client_id);
+                const project = Projects.byId(inv.project_id);
+                return `
+                  <div class="py-4 flex items-start justify-between gap-3 flex-wrap">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <div class="font-medium text-xs font-mono">${U.esc(inv.id)}</div>
+                        ${UI.statusChip(reminder.isOverdue ? 'overdue' : 'sent')}
+                        <span class="chip ${reminder.isOverdue ? 'chip-danger' : 'chip-amber'}"><span class="chip-dot"></span>${reminder.isOverdue ? 'Overdue follow-up' : 'Due soon follow-up'}</span>
+                      </div>
+                      <div class="text-sm mt-2" style="color:var(--ink-muted)">${U.esc(client?.name || '-')} · ${U.esc(project?.name || 'No project')}</div>
+                      <div class="text-xs mt-1" style="color:var(--ink-faint)">Due ${U.esc(reminder.dueAt ? U.fmtDay(reminder.dueAt) : '-')} · ${U.esc(reminder.reason || '')}</div>
+                      ${reminder.lastRemindedAt ? `<div class="text-xs mt-1" style="color:var(--ink-muted)">Last reminder: ${U.esc(U.fmtDate(reminder.lastRemindedAt))}</div>` : ''}
+                    </div>
+                    <div class="min-w-[170px] text-right">
+                      ${!reminderFeed.unsupported
+                        ? `<button class="btn btn-primary text-xs" data-inv-remind="${inv.id}">${I.export}<span>Mark reminder sent</span></button>`
+                        : `<span class="text-xs" style="color:var(--ink-faint)">${U.esc(DataLayer.isApi() ? 'Upgrade backend to send reminders' : 'API mode required to send reminders')}</span>`}
+                    </div>
+                  </div>`;
+              }).join('')}</div>`
+            : `<div class="text-sm" style="color:var(--ink-muted)">No due or overdue reminder candidates right now.</div>`}
+        ${reminderFeed.unsupported
+          ? `<div class="text-xs" style="color:var(--ink-faint)">${U.esc(reminderFeed.reason === 'local_mode'
+            ? 'Showing local reminder candidates. Connect API mode to log reminders.'
+            : 'This backend does not expose /api/invoices/reminders yet. Showing fallback reminder candidates.')}</div>`
+          : ''}
+      </section>
+
+      <section class="card p-6 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
             <div class="eyebrow">Invoices</div>
             <h2 class="h2">All invoices</h2>
             <div class="text-sm mt-1" style="color:var(--ink-muted)">Drafts stay internal until you mark them sent. Paid invoices remain here as your billing history.</div>
@@ -3337,6 +3937,9 @@ Pages.billing = async () => {
                     <div class="font-mono text-lg">${U.fmtMoney(inv.amount, inv.currency || 'USD')}</div>
                     <div class="flex gap-2 flex-wrap justify-end mt-3">
                       ${renderInvoicePrimaryAction(inv)}
+                      ${DataLayer.isApi() && inv.status === 'sent' && isOnChainRail(inv.provider)
+                        ? `<button class="btn btn-ghost text-xs" data-inv-reconcile="${inv.id}">${I.check}<span>Reconcile on-chain</span></button>`
+                        : ''}
                       ${inv.payment_address ? `<button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.payment_address)}">${I.copy}<span>Copy address</span></button>` : ''}
                       ${inv.status === 'draft' ? `<button class="btn btn-ghost text-xs" data-inv-delete="${inv.id}" style="color:var(--danger)">Delete draft</button>` : ''}
                     </div>
@@ -3781,6 +4384,49 @@ Pages.billing.mount = () => {
     Toast.show('Draft invoice deleted');
     await router.render();
   }));
+  document.querySelectorAll('[data-inv-reconcile]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!DataLayer.isApi()) { Toast.show('Reconcile requires API mode', 'err'); return; }
+    const invoiceId = btn.dataset.invReconcile;
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `${I.chart}<span>Reconciling...</span>`;
+    try {
+      const result = await Revenue.reconcileInvoice(invoiceId);
+      if (result?.unsupported) {
+        Toast.show('Reconcile endpoint is unavailable on this backend', 'err');
+        return;
+      }
+      Toast.show('Reconciliation complete');
+      await router.render();
+    } catch (err) {
+      Toast.show(err.message || String(err), 'err');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }));
+  document.querySelectorAll('[data-inv-remind]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!DataLayer.isApi()) { Toast.show('Reminders require API mode', 'err'); return; }
+    if (!confirm('Mark reminder as sent for this invoice?')) return;
+    const invoiceId = btn.dataset.invRemind;
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `${I.export}<span>Saving...</span>`;
+    try {
+      const result = await Revenue.markReminderSent(invoiceId, { source: 'billing-ui' });
+      if (result?.unsupported) {
+        Toast.show('Reminder endpoint is unavailable on this backend', 'err');
+        return;
+      }
+      Toast.show('Reminder marked sent');
+      await router.render();
+    } catch (err) {
+      Toast.show(err.message || String(err), 'err');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }));
   document.querySelectorAll('[data-payout-status]').forEach(btn => btn.addEventListener('click', async () => {
     const next = btn.dataset.next;
     if (next === 'queued' && !confirm('Queue this payout run for settlement? You can still mark it completed later.')) return;
@@ -3863,15 +4509,39 @@ Pages.portal = async () => {
             <div class="h-2 rounded-full mb-4" style="background:var(--bg-sunken)">
               <div class="bar h-2 rounded-full" style="width:${pct}%; background:var(--brand)"></div>
             </div>
-            ${deliverables.length ? `<div class="divide-hair">` + deliverables.map(d => `
-              <div class="py-3 flex items-center justify-between gap-3">
-                <div>
-                  <div class="font-medium">${U.esc(d.name)}</div>
-                  ${d.note ? `<div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(d.note)}</div>` : ''}
+            ${deliverables.length ? `<div class="divide-hair">` + deliverables.map((d, idx) => {
+              const approvalStatus = deliverableApprovalStatus(d);
+              const approvalBadge = renderDeliverableApprovalBadge(d, { showPending: d.status === 'delivered' });
+              const deliverableId = d.id || `del_${idx + 1}`;
+              const approvalKey = `${project.id}__${deliverableId}`;
+              const canSubmitApproval = DataLayer.isApi() && d.status === 'delivered' && approvalStatus !== 'approved';
+              return `
+              <div class="py-3 space-y-3">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                  <div class="min-w-0 flex-1">
+                    <div class="font-medium">${U.esc(d.name)}</div>
+                    ${d.note ? `<div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(d.note)}</div>` : ''}
+                    ${renderDeliverableApprovalNote(d)}
+                    ${renderDeliverableAttachmentLinks(d, { compact: true })}
+                  </div>
+                  <div class="flex items-center gap-2 flex-wrap justify-end">
+                    ${UI.statusChip(d.status)}
+                    ${approvalBadge}
+                  </div>
                 </div>
-                ${UI.statusChip(d.status)}
-              </div>
-            `).join('') + `</div>` : `<div class="text-sm" style="color:var(--ink-muted)">No deliverables tracked yet.</div>`}
+                ${canSubmitApproval ? `
+                  <div class="card-flat p-3 space-y-2">
+                    <div class="text-xs" style="color:var(--ink-muted)">Approve this deliverable or request changes.</div>
+                    <input class="field" data-del-approval-note="${U.esc(approvalKey)}" placeholder="Optional note for your operator" value="${U.esc(d.approval_note || '')}" />
+                    <div class="flex gap-2 flex-wrap">
+                      <button class="btn btn-primary text-xs" data-del-approval-project="${U.esc(project.id)}" data-del-approval-id="${U.esc(deliverableId)}" data-decision="approved" data-note-key="${U.esc(approvalKey)}">${I.check}<span>Approve</span></button>
+                      <button class="btn btn-ghost text-xs" style="color:var(--danger)" data-del-approval-project="${U.esc(project.id)}" data-del-approval-id="${U.esc(deliverableId)}" data-decision="rejected" data-note-key="${U.esc(approvalKey)}">${I.x}<span>Request changes</span></button>
+                    </div>
+                  </div>` : (!DataLayer.isApi() && d.status === 'delivered'
+                    ? `<div class="text-xs" style="color:var(--ink-faint)">Approval actions are available when connected to an API backend.</div>`
+                    : '')}
+              </div>`;
+            }).join('') + `</div>` : `<div class="text-sm" style="color:var(--ink-muted)">No deliverables tracked yet.</div>`}
           </section>`;
       }).join('')}
 
@@ -3902,6 +4572,36 @@ Pages.portal.mount = () => {
   document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
     await U.copyToClipboard(btn.dataset.copy);
     Toast.show('Copied');
+  }));
+
+  document.querySelectorAll('[data-del-approval-project]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!DataLayer.isApi()) {
+      Toast.show('Approval actions require API mode', 'err');
+      return;
+    }
+    const projectId = btn.dataset.delApprovalProject;
+    const deliverableId = btn.dataset.delApprovalId;
+    const decision = btn.dataset.decision;
+    const noteKey = btn.dataset.noteKey;
+    const noteInput = noteKey ? document.querySelector(`[data-del-approval-note="${noteKey}"]`) : null;
+    const note = String(noteInput?.value || '').trim();
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `${I.chart}<span>Saving...</span>`;
+    try {
+      await Projects.submitDeliverableApproval(projectId, deliverableId, {
+        decision,
+        status: decision,
+        note: note || null,
+      });
+      Toast.show(decision === 'approved' ? 'Deliverable approved' : 'Change request sent');
+      await router.render();
+    } catch (err) {
+      Toast.show(err.message || String(err), 'err');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
   }));
 };
 
@@ -4016,18 +4716,25 @@ Pages.share = async () => {
         <div class="h-3 rounded-full mb-6" style="background:var(--bg-sunken)">
           <div class="bar h-3 rounded-full" style="width:${pct}%; background: linear-gradient(90deg, var(--brand), #6366f1)"></div>
         </div>
-        ${deliverables.length ? `<div class="divide-hair">` + deliverables.map(d => `
-          <div class="py-3 flex items-center justify-between gap-3">
-            <div class="flex items-start gap-3">
+        ${deliverables.length ? `<div class="divide-hair">` + deliverables.map(d => {
+          const approvalBadge = renderDeliverableApprovalBadge(d, { showPending: d.status === 'delivered' });
+          return `
+          <div class="py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-start gap-3 min-w-0 flex-1">
               <div class="mt-1">${d.status === 'delivered' ? `<div style="color:#1f5d23">${I.check}</div>` : d.status === 'in_progress' ? `<div style="color:var(--brand)">${I.chart}</div>` : `<div style="color:var(--ink-faint)">${I.file}</div>`}</div>
-              <div>
+              <div class="min-w-0">
                 <div class="font-medium">${U.esc(d.name)}</div>
                 ${d.note ? `<div class="text-xs mt-1" style="color:var(--ink-muted)">${U.esc(d.note)}</div>` : ''}
+                ${renderDeliverableApprovalNote(d)}
+                ${renderDeliverableAttachmentLinks(d, { compact: true })}
               </div>
             </div>
-            ${UI.statusChip(d.status)}
-          </div>
-        `).join('') + `</div>` : `<div class="text-sm" style="color:var(--ink-muted)">No deliverables tracked yet.</div>`}
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+              ${UI.statusChip(d.status)}
+              ${approvalBadge}
+            </div>
+          </div>`;
+        }).join('') + `</div>` : `<div class="text-sm" style="color:var(--ink-muted)">No deliverables tracked yet.</div>`}
       </section>
 
       ${invoices.length ? `

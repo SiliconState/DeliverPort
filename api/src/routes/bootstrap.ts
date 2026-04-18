@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { prisma } from '../db.js';
 import { authMiddleware } from '../middleware.js';
+import {
+  fromUserMetaStorageKey,
+  isPrimaryUserMetaStorageKey,
+  userMetaPrefixes,
+} from '../meta-keys.js';
 
 const bootstrap = new Hono();
 
@@ -8,14 +13,14 @@ bootstrap.use('*', authMiddleware);
 
 /**
  * GET /api/bootstrap
- * Returns all startup data in one round-trip for the authenticated operator.
- * This replaces multiple startup requests from the frontend.
+ * Returns all startup data in one round-trip for the authenticated operator/client.
  */
 bootstrap.get('/', async (c) => {
   const auth = c.get('user');
   const { userId } = auth;
+  const metaPrefixes = userMetaPrefixes(userId);
 
-  const [clients, projects, invoices, payoutRuns, users, meta] = await Promise.all([
+  const [clients, projects, invoices, payoutRuns, users, metaRows] = await Promise.all([
     prisma.client.findMany({
       where: { owner_id: userId },
       orderBy: { created_at: 'desc' },
@@ -57,8 +62,38 @@ bootstrap.get('/', async (c) => {
         last_login_at: true,
       },
     }),
-    prisma.meta.findMany(),
+    prisma.meta.findMany({
+      where: {
+        OR: metaPrefixes.map((prefix) => ({
+          key: {
+            startsWith: prefix,
+          },
+        })),
+      },
+      orderBy: {
+        key: 'asc',
+      },
+    }),
   ]);
+
+  const mergedMeta = new Map<string, { key: string; value: unknown; primary: boolean }>();
+  for (const row of metaRows) {
+    const key = fromUserMetaStorageKey(userId, row.key);
+    const primary = isPrimaryUserMetaStorageKey(userId, row.key);
+    const existing = mergedMeta.get(key);
+
+    if (!existing || (primary && !existing.primary)) {
+      mergedMeta.set(key, {
+        key,
+        value: row.value,
+        primary,
+      });
+    }
+  }
+
+  const meta = Array.from(mergedMeta.values())
+    .sort((left, right) => left.key.localeCompare(right.key))
+    .map((entry) => ({ key: entry.key, value: entry.value }));
 
   // Keep this response fresh (frontend manages a short-lived session cache explicitly).
   c.header('Cache-Control', 'private, no-store');

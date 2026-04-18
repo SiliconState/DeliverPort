@@ -15,6 +15,8 @@ import portalRoutes from './routes/portal.js';
 import userRoutes from './routes/users.js';
 import metaRoutes from './routes/meta.js';
 import bootstrapRoutes from './routes/bootstrap.js';
+import auditEventRoutes from './routes/audit-events.js';
+import auditRoutes from './routes/audit.js';
 
 const app = new Hono();
 
@@ -70,6 +72,8 @@ app.route('/api/payout-runs', payoutRunRoutes);
 app.route('/api/portal', portalRoutes);
 app.route('/api/users', userRoutes);
 app.route('/api/meta', metaRoutes);
+app.route('/api/audit-events', auditEventRoutes);
+app.route('/api/audit', auditRoutes);
 
 // ---------------------
 // 404 fallback
