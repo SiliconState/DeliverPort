@@ -984,6 +984,56 @@ const ApiClient = {
   async put(path, body)    { return this._fetch('PUT', path, body); },
   async del(path)          { return this._fetch('DELETE', path); },
 
+  mapInvoiceFromApi(inv) {
+    if (!inv || typeof inv !== 'object') return inv;
+    const issuedAt = inv.issued_at ? Date.parse(inv.issued_at) : NaN;
+    const dueDays = Number(inv.due_days);
+    const fallbackDueAt = Number.isFinite(issuedAt) && Number.isFinite(dueDays)
+      ? new Date(issuedAt + (Math.max(0, dueDays) * 24 * 3600 * 1000)).toISOString()
+      : null;
+    return {
+      ...inv,
+      amount: inv.amount != null ? Number(inv.amount) : Number(inv.total || 0),
+      provider: inv.provider || inv.payment_rail || null,
+      external_ref: inv.external_ref || inv.tx_hash || null,
+      due_at: inv.due_at || fallbackDueAt,
+      line_items: Array.isArray(inv.line_items) ? inv.line_items : [],
+    };
+  },
+
+  mapInvoiceToApi(data = {}) {
+    const dueAtMs = data.due_at ? Date.parse(data.due_at) : NaN;
+    const dueDaysFromDueAt = Number.isFinite(dueAtMs)
+      ? Math.max(1, Math.round((dueAtMs - Date.now()) / (24 * 3600 * 1000)))
+      : null;
+    return {
+      ...data,
+      total: data.total != null ? data.total : (data.amount ?? 0),
+      payment_rail: data.payment_rail || data.provider || 'USDC (Base)',
+      tx_hash: data.tx_hash || data.external_ref || null,
+      due_days: data.due_days != null ? data.due_days : (dueDaysFromDueAt ?? 14),
+    };
+  },
+
+  mapPayoutRunFromApi(run) {
+    if (!run || typeof run !== 'object') return run;
+    return {
+      ...run,
+      amount: run.amount != null ? Number(run.amount) : Number(run.total || 0),
+      provider: run.provider || run.payment_rail || null,
+      line_items: Array.isArray(run.line_items) ? run.line_items : (Array.isArray(run.entries) ? run.entries : []),
+      queued_at: run.queued_at || (run.status === 'queued' ? run.created_at : null),
+    };
+  },
+
+  mapPayoutRunToApi(data = {}) {
+    const out = { ...data };
+    if (out.total == null && data.amount != null) out.total = data.amount;
+    if (!out.payment_rail && data.provider) out.payment_rail = data.provider;
+    if (!('entries' in out) && Array.isArray(data.line_items)) out.entries = data.line_items;
+    return out;
+  },
+
   // ── Auth ──
   async signIn(email, password) {
     const data = await this.post('/api/auth/login', { email, password });
@@ -1007,27 +1057,52 @@ const ApiClient = {
   },
 
   // ── Clients ──
-  async getClients()                { return this.get('/api/clients'); },
-  async createClient(data)          { return this.post('/api/clients', data); },
-  async updateClient(id, data)      { return this.put(`/api/clients/${id}`, data); },
+  async getClients()                { const r = await this.get('/api/clients'); return r.clients || r; },
+  async createClient(data)          { const r = await this.post('/api/clients', data); return r.client || r; },
+  async updateClient(id, data)      { const r = await this.put(`/api/clients/${id}`, data); return r.client || r; },
   async deleteClient(id)            { return this.del(`/api/clients/${id}`); },
 
   // ── Projects ──
-  async getProjects()               { return this.get('/api/projects'); },
-  async createProject(data)         { return this.post('/api/projects', data); },
-  async updateProject(id, data)     { return this.put(`/api/projects/${id}`, data); },
+  async getProjects()               { const r = await this.get('/api/projects'); return r.projects || r; },
+  async createProject(data)         { const r = await this.post('/api/projects', data); return r.project || r; },
+  async updateProject(id, data)     { const r = await this.put(`/api/projects/${id}`, data); return r.project || r; },
   async deleteProject(id)           { return this.del(`/api/projects/${id}`); },
 
   // ── Invoices ──
-  async getInvoices()               { const r = await this.get('/api/invoices'); return r.invoices || r; },
-  async createInvoice(data)         { const r = await this.post('/api/invoices', data); return r.invoice || r; },
-  async updateInvoiceStatus(id, status, extra = {}) { const r = await this.put(`/api/invoices/${id}/status`, { status, ...extra }); return r.invoice || r; },
+  async getInvoices() {
+    const r = await this.get('/api/invoices');
+    const rows = r.invoices || r;
+    return Array.isArray(rows) ? rows.map(inv => this.mapInvoiceFromApi(inv)) : rows;
+  },
+  async createInvoice(data) {
+    const payload = this.mapInvoiceToApi(data);
+    const r = await this.post('/api/invoices', payload);
+    return this.mapInvoiceFromApi(r.invoice || r);
+  },
+  async updateInvoiceStatus(id, status, extra = {}) {
+    const payload = { status, ...extra };
+    if (payload.external_ref && !payload.tx_hash) payload.tx_hash = payload.external_ref;
+    const r = await this.put(`/api/invoices/${id}/status`, payload);
+    return this.mapInvoiceFromApi(r.invoice || r);
+  },
   async deleteInvoice(id)           { return this.del(`/api/invoices/${id}`); },
 
   // ── Payout Runs ──
-  async getPayoutRuns()             { const r = await this.get('/api/payout-runs'); return r.payout_runs || r.payoutRuns || r; },
-  async createPayoutRun(data)       { const r = await this.post('/api/payout-runs', data); return r.payout_run || r.payoutRun || r; },
-  async updatePayoutStatus(id, status, extra = {}) { return this.put(`/api/payout-runs/${id}`, { status, ...extra }); },
+  async getPayoutRuns() {
+    const r = await this.get('/api/payout-runs');
+    const rows = r.payout_runs || r.payoutRuns || r;
+    return Array.isArray(rows) ? rows.map(run => this.mapPayoutRunFromApi(run)) : rows;
+  },
+  async createPayoutRun(data) {
+    const payload = this.mapPayoutRunToApi(data);
+    const r = await this.post('/api/payout-runs', payload);
+    return this.mapPayoutRunFromApi(r.payout_run || r.payoutRun || r);
+  },
+  async updatePayoutStatus(id, status, extra = {}) {
+    const payload = this.mapPayoutRunToApi({ status, ...extra });
+    const r = await this.put(`/api/payout-runs/${id}`, payload);
+    return this.mapPayoutRunFromApi(r.payout_run || r.payoutRun || r);
+  },
   async deletePayoutRun(id)         { return this.del(`/api/payout-runs/${id}`); },
 
   // ── Users ──
@@ -1356,18 +1431,40 @@ function normalizeProject(p) {
 
 function normalizeInvoice(i) {
   let line_items = i?.line_items;
+  if (line_items == null && Array.isArray(i?.entries)) line_items = i.entries;
   if (typeof line_items === 'string') {
     try { line_items = JSON.parse(line_items); } catch { line_items = []; }
   }
-  return { ...i, amount: i?.amount == null ? 0 : Number(i.amount), line_items: Array.isArray(line_items) ? line_items : [] };
+
+  const amountValue = i?.amount ?? i?.total ?? 0;
+  const issuedAt = i?.issued_at ? Date.parse(i.issued_at) : NaN;
+  const dueDays = Number(i?.due_days);
+  const inferredDueAt = Number.isFinite(issuedAt) && Number.isFinite(dueDays)
+    ? new Date(issuedAt + (Math.max(0, dueDays) * 24 * 3600 * 1000)).toISOString()
+    : null;
+
+  return {
+    ...i,
+    amount: Number(amountValue || 0),
+    provider: i?.provider || i?.payment_rail || null,
+    external_ref: i?.external_ref || i?.tx_hash || null,
+    due_at: i?.due_at || inferredDueAt,
+    line_items: Array.isArray(line_items) ? line_items : [],
+  };
 }
 
 function normalizePayoutRun(run) {
-  let line_items = run?.line_items;
+  let line_items = run?.line_items ?? run?.entries;
   if (typeof line_items === 'string') {
     try { line_items = JSON.parse(line_items); } catch { line_items = []; }
   }
-  return { ...run, amount: run?.amount == null ? 0 : Number(run.amount), line_items: Array.isArray(line_items) ? line_items : [] };
+  return {
+    ...run,
+    amount: Number((run?.amount ?? run?.total ?? 0) || 0),
+    provider: run?.provider || run?.payment_rail || null,
+    line_items: Array.isArray(line_items) ? line_items : [],
+    queued_at: run?.queued_at || (run?.status === 'queued' ? run?.created_at || null : null),
+  };
 }
 
 /* ══════════════════════════════════════ 10. SERVICES ══════════════════════════════════════ */
