@@ -4648,27 +4648,35 @@ Pages.share = async () => {
   const params = U.hashParams();
   const token = params.token || '';
   let project = token ? Projects.portalByToken(token) : null;
+  let portalSnapshot = null;
 
-  // In API mode, fetch portal data from the backend if not found locally
+  // In API mode, fetch portal data from backend for public/share-only access.
   if (!project && token && DataLayer.isApi()) {
     try {
       const portalData = await ApiClient.getPortal(token);
       if (portalData?.project) {
-        // Inject into Store temporarily for rendering
-        project = normalizeProject(portalData.project);
-        if (portalData.client && !Clients.byId(portalData.client.id)) {
-          Store.state.clients = [...Store.state.clients, portalData.client];
-        }
-        if (portalData.invoices) {
-          const existingIds = new Set(Store.state.invoices.map(i => i.id));
-          const newInvoices = portalData.invoices.filter(i => !existingIds.has(i.id)).map(normalizeInvoice);
-          Store.state.invoices = [...Store.state.invoices, ...newInvoices];
-        }
-        if (!Projects.portalByToken(token)) {
-          Store.state.projects = [...Store.state.projects, project];
-        }
+        const normalizedProject = normalizeProject({
+          ...portalData.project,
+          id: portalData.project.id || `portal_${token}`,
+          client_id: portalData.project.client_id || portalData.client?.id || portalData.project.client?.id || null,
+          portal_token: portalData.project.portal_token || token,
+        });
+        const portalClient = portalData.client || portalData.project.client || null;
+        const portalInvoices = (portalData.invoices || []).map(inv => normalizeInvoice({
+          ...inv,
+          project_id: inv.project_id || normalizedProject.id,
+          client_id: inv.client_id || normalizedProject.client_id,
+        }));
+
+        portalSnapshot = {
+          client: portalClient,
+          invoices: portalInvoices,
+        };
+        project = normalizedProject;
       }
-    } catch (e) { console.warn('[Share] API portal fetch failed:', e.message); }
+    } catch (e) {
+      console.warn('[Share] API portal fetch failed:', e.message);
+    }
   }
 
   if (!project) {
@@ -4679,12 +4687,14 @@ Pages.share = async () => {
     `;
   }
 
-  const client = Clients.byId(project.client_id);
+  const client = portalSnapshot?.client || project.client || Clients.byId(project.client_id);
   const deliverables = project.deliverables || [];
   const delivered = deliverables.filter(d => d.status === 'delivered').length;
   const total = deliverables.length;
   const pct = total ? Math.round((delivered / total) * 100) : 0;
-  const invoices = Revenue.visibleForProjectShare(project.id);
+  const invoices = portalSnapshot
+    ? portalSnapshot.invoices.filter(i => ['sent', 'paid'].includes(i.status))
+    : Revenue.visibleForProjectShare(project.id);
   const paidTotal = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.amount || 0), 0);
   const outstandingInvoices = invoices.filter(i => i.status === 'sent');
   const outstandingTotal = outstandingInvoices.reduce((s, i) => s + Number(i.amount || 0), 0);
@@ -4842,10 +4852,13 @@ Pages.share.mount = () => {
         showStatus(`✓ Payment confirmed!<br/><a href="${Crypto.txUrl(hash)}" target="_blank" class="underline" style="color:var(--brand)">View on BaseScan →</a>`, 'var(--brand)');
         btn.innerHTML = `${I.check}<span>Paid</span>`;
         btn.classList.remove('btn-primary'); btn.classList.add('btn');
-        // Mark invoice as paid in local DB if possible
-        try {
-          await Revenue.setInvoiceStatus(invoiceId, 'paid', { provider: `${token} (Base)`, external_ref: hash });
-        } catch { /* share page may not have write access */ }
+        // Only attempt status write when this view has authenticated write access.
+        const canPersistPaidStatus = !DataLayer.isApi() || !!ApiClient.token;
+        if (canPersistPaidStatus) {
+          try {
+            await Revenue.setInvoiceStatus(invoiceId, 'paid', { provider: `${token} (Base)`, external_ref: hash });
+          } catch { /* share page may not have write access */ }
+        }
       } else {
         throw new Error('Transaction reverted on-chain');
       }

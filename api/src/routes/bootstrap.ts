@@ -11,56 +11,70 @@ const bootstrap = new Hono();
 
 bootstrap.use('*', authMiddleware);
 
+const CLIENT_VISIBLE_INVOICE_STATUSES = ['sent', 'paid'];
+
 /**
  * GET /api/bootstrap
- * Returns all startup data in one round-trip for the authenticated operator/client.
+ * Returns startup data in one round-trip for the authenticated operator/client.
  */
 bootstrap.get('/', async (c) => {
   const auth = c.get('user');
   const { userId } = auth;
   const metaPrefixes = userMetaPrefixes(userId);
 
-  const [clients, projects, invoices, payoutRuns, users, metaRows] = await Promise.all([
+  let workspaceOwnerId = userId;
+  let clientScopeId: string | null = null;
+
+  if (auth.role === 'client') {
+    const actor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { client_id: true },
+    });
+
+    if (!actor?.client_id) {
+      return c.json({ error: 'Client account is not linked to a client workspace' }, 403);
+    }
+
+    const linkedClient = await prisma.client.findUnique({
+      where: { id: actor.client_id },
+      select: { id: true, owner_id: true },
+    });
+
+    if (!linkedClient) {
+      return c.json({ error: 'Linked client record was not found' }, 404);
+    }
+
+    workspaceOwnerId = linkedClient.owner_id;
+    clientScopeId = linkedClient.id;
+  }
+
+  const [clients, projects, invoices, metaRows] = await Promise.all([
     prisma.client.findMany({
-      where: { owner_id: userId },
+      where: clientScopeId
+        ? { owner_id: workspaceOwnerId, id: clientScopeId }
+        : { owner_id: workspaceOwnerId },
       orderBy: { created_at: 'desc' },
     }),
     prisma.project.findMany({
-      where: { owner_id: userId },
+      where: clientScopeId
+        ? { owner_id: workspaceOwnerId, client_id: clientScopeId }
+        : { owner_id: workspaceOwnerId },
       include: { client: { select: { id: true, name: true, company: true } } },
       orderBy: { created_at: 'desc' },
     }),
     prisma.invoice.findMany({
-      where: { owner_id: userId },
+      where: clientScopeId
+        ? {
+          owner_id: workspaceOwnerId,
+          client_id: clientScopeId,
+          status: { in: CLIENT_VISIBLE_INVOICE_STATUSES },
+        }
+        : { owner_id: workspaceOwnerId },
       include: {
         client: { select: { id: true, name: true, company: true } },
         project: { select: { id: true, name: true } },
       },
       orderBy: { issued_at: 'desc' },
-    }),
-    prisma.payoutRun.findMany({
-      where: { owner_id: userId },
-      orderBy: { created_at: 'desc' },
-    }),
-    prisma.user.findMany({
-      where: {
-        OR: [
-          { id: userId },
-          { client: { owner_id: userId } },
-        ],
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        wallet_address: true,
-        phone: true,
-        auth_status: true,
-        client_id: true,
-        joined_at: true,
-        last_login_at: true,
-      },
     }),
     prisma.meta.findMany({
       where: {
@@ -75,6 +89,50 @@ bootstrap.get('/', async (c) => {
       },
     }),
   ]);
+
+  const payoutRuns = auth.role === 'client'
+    ? []
+    : await prisma.payoutRun.findMany({
+      where: { owner_id: workspaceOwnerId },
+      orderBy: { created_at: 'desc' },
+    });
+
+  const users = auth.role === 'client'
+    ? await prisma.user.findMany({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        wallet_address: true,
+        phone: true,
+        auth_status: true,
+        client_id: true,
+        joined_at: true,
+        last_login_at: true,
+      },
+    })
+    : await prisma.user.findMany({
+      where: {
+        OR: [
+          { id: userId },
+          { client: { owner_id: workspaceOwnerId } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        wallet_address: true,
+        phone: true,
+        auth_status: true,
+        client_id: true,
+        joined_at: true,
+        last_login_at: true,
+      },
+    });
 
   const mergedMeta = new Map<string, { key: string; value: unknown; primary: boolean }>();
   for (const row of metaRows) {
@@ -100,7 +158,11 @@ bootstrap.get('/', async (c) => {
   c.header('Vary', 'Authorization, Accept-Encoding');
 
   return c.json({
-    auth,
+    auth: {
+      ...auth,
+      workspace_owner_id: workspaceOwnerId,
+      client_scope_id: clientScopeId,
+    },
     clients,
     projects,
     invoices,
