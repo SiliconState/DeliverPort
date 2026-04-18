@@ -1,7 +1,6 @@
 import { randomBytes } from 'crypto';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from './db.js';
-import { TENANT_NAMESPACES, tenantNamespacePrefix, tenantScopedKey } from './tenant.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -9,6 +8,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function randomId(): string {
   return randomBytes(6).toString('hex');
+}
+
+function makeEventId(timestampIso: string): string {
+  return `${timestampIso}-${randomId()}`;
+}
+
+function toDetailsObject(value: Prisma.JsonValue | null): Record<string, unknown> | null {
+  if (!value || !isRecord(value)) return null;
+  return value;
 }
 
 export interface AuditEvent {
@@ -35,31 +43,41 @@ export interface LogAuditEventInput {
   details?: Record<string, unknown> | null;
 }
 
-/** Persist one audit event in tenant-scoped Meta storage. */
+/** Persist one audit event in the dedicated audit_events table. */
 export async function logAuditEvent(input: LogAuditEventInput): Promise<AuditEvent> {
-  const createdAt = new Date().toISOString();
-  const event: AuditEvent = {
-    id: `${createdAt}-${randomId()}`,
-    owner_id: input.ownerId,
-    actor_id: input.actorId ?? null,
-    actor_role: input.actorRole ?? null,
-    action: input.action,
-    entity_type: input.entityType,
-    entity_id: input.entityId ?? null,
-    summary: input.summary ?? null,
-    details: input.details ?? null,
-    created_at: createdAt,
-  };
+  const createdAt = new Date();
+  const createdAtIso = createdAt.toISOString();
+  const id = makeEventId(createdAtIso);
 
-  const key = tenantScopedKey(input.ownerId, TENANT_NAMESPACES.audit, event.id);
-  await prisma.meta.create({
+  const row = await prisma.auditEvent.create({
     data: {
-      key,
-      value: event as unknown as Prisma.InputJsonValue,
+      id,
+      owner_id: input.ownerId,
+      actor_id: input.actorId ?? null,
+      actor_role: input.actorRole ?? null,
+      action: input.action,
+      entity_type: input.entityType,
+      entity_id: input.entityId ?? null,
+      summary: input.summary ?? null,
+      details: input.details === undefined || input.details === null
+        ? Prisma.JsonNull
+        : (input.details as Prisma.InputJsonValue),
+      created_at: createdAt,
     },
   });
 
-  return event;
+  return {
+    id: row.id,
+    owner_id: row.owner_id,
+    actor_id: row.actor_id,
+    actor_role: row.actor_role,
+    action: row.action,
+    entity_type: row.entity_type,
+    entity_id: row.entity_id,
+    summary: row.summary,
+    details: toDetailsObject(row.details),
+    created_at: row.created_at.toISOString(),
+  };
 }
 
 /** Best-effort audit logging wrapper; write failures should not fail requests. */
@@ -79,43 +97,34 @@ export interface ListAuditEventsOptions {
 }
 
 export async function listAuditEvents(ownerId: string, options: ListAuditEventsOptions = {}): Promise<AuditEvent[]> {
-  const prefix = tenantNamespacePrefix(ownerId, TENANT_NAMESPACES.audit);
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 300);
 
-  const rows = await prisma.meta.findMany({
+  const rows = await prisma.auditEvent.findMany({
     where: {
-      key: { startsWith: prefix },
+      owner_id: ownerId,
+      ...(options.entityType ? { entity_type: options.entityType } : {}),
+      ...(options.entityId ? { entity_id: options.entityId } : {}),
+      ...(options.action ? { action: options.action } : {}),
     },
-    orderBy: { key: 'desc' },
+    orderBy: [
+      { created_at: 'desc' },
+      { id: 'desc' },
+    ],
     take: limit,
   });
 
-  const events: AuditEvent[] = [];
-  for (const row of rows) {
-    if (!isRecord(row.value)) continue;
-
-    const event = row.value as Record<string, unknown>;
-    const normalized: AuditEvent = {
-      id: typeof event.id === 'string' ? event.id : row.key.slice(prefix.length),
-      owner_id: typeof event.owner_id === 'string' ? event.owner_id : ownerId,
-      actor_id: typeof event.actor_id === 'string' ? event.actor_id : null,
-      actor_role: typeof event.actor_role === 'string' ? event.actor_role : null,
-      action: typeof event.action === 'string' ? event.action : 'unknown',
-      entity_type: typeof event.entity_type === 'string' ? event.entity_type : 'unknown',
-      entity_id: typeof event.entity_id === 'string' ? event.entity_id : null,
-      summary: typeof event.summary === 'string' ? event.summary : null,
-      details: isRecord(event.details) ? event.details : null,
-      created_at: typeof event.created_at === 'string' ? event.created_at : new Date(0).toISOString(),
-    };
-
-    if (options.entityType && normalized.entity_type !== options.entityType) continue;
-    if (options.entityId && normalized.entity_id !== options.entityId) continue;
-    if (options.action && normalized.action !== options.action) continue;
-
-    events.push(normalized);
-  }
-
-  return events;
+  return rows.map((row) => ({
+    id: row.id,
+    owner_id: row.owner_id,
+    actor_id: row.actor_id,
+    actor_role: row.actor_role,
+    action: row.action,
+    entity_type: row.entity_type,
+    entity_id: row.entity_id,
+    summary: row.summary,
+    details: toDetailsObject(row.details),
+    created_at: row.created_at.toISOString(),
+  }));
 }
 
 export interface InvoiceReminder {
@@ -142,70 +151,65 @@ export interface CreateInvoiceReminderInput {
 }
 
 export async function createInvoiceReminder(input: CreateInvoiceReminderInput): Promise<InvoiceReminder> {
-  const createdAt = new Date().toISOString();
-  const reminder: InvoiceReminder = {
-    id: `${createdAt}-${randomId()}`,
-    invoice_id: input.invoiceId,
-    owner_id: input.ownerId,
-    actor_user_id: input.actorUserId,
-    channel: input.channel,
-    recipient: input.recipient ?? null,
-    note: input.note ?? null,
-    status: input.status ?? 'sent',
-    sent_at: (input.status ?? 'sent') === 'sent' ? createdAt : null,
-    created_at: createdAt,
-  };
+  const createdAt = new Date();
+  const status = input.status ?? 'sent';
+  const sentAt = status === 'sent' ? createdAt : null;
+  const id = makeEventId(createdAt.toISOString());
 
-  const localKey = `${input.invoiceId}:${reminder.id}`;
-  const key = tenantScopedKey(input.ownerId, TENANT_NAMESPACES.reminder, localKey);
-
-  await prisma.meta.create({
+  const row = await prisma.invoiceReminder.create({
     data: {
-      key,
-      value: reminder as unknown as Prisma.InputJsonValue,
+      id,
+      invoice_id: input.invoiceId,
+      owner_id: input.ownerId,
+      actor_user_id: input.actorUserId,
+      channel: input.channel,
+      recipient: input.recipient ?? null,
+      note: input.note ?? null,
+      status,
+      sent_at: sentAt,
+      created_at: createdAt,
     },
   });
 
-  return reminder;
+  return {
+    id: row.id,
+    invoice_id: row.invoice_id,
+    owner_id: row.owner_id,
+    actor_user_id: row.actor_user_id,
+    channel: row.channel,
+    recipient: row.recipient,
+    note: row.note,
+    status: row.status === 'pending' || row.status === 'cancelled' ? row.status : 'sent',
+    sent_at: row.sent_at ? row.sent_at.toISOString() : null,
+    created_at: row.created_at.toISOString(),
+  };
 }
 
 export async function listInvoiceReminders(ownerId: string, invoiceId?: string): Promise<InvoiceReminder[]> {
-  const prefix = invoiceId
-    ? tenantScopedKey(ownerId, TENANT_NAMESPACES.reminder, `${invoiceId}:`)
-    : tenantNamespacePrefix(ownerId, TENANT_NAMESPACES.reminder);
-
-  const rows = await prisma.meta.findMany({
+  const rows = await prisma.invoiceReminder.findMany({
     where: {
-      key: { startsWith: prefix },
+      owner_id: ownerId,
+      ...(invoiceId ? { invoice_id: invoiceId } : {}),
     },
-    orderBy: { key: 'desc' },
+    orderBy: [
+      { created_at: 'desc' },
+      { id: 'desc' },
+    ],
     take: 500,
   });
 
-  const reminders: InvoiceReminder[] = [];
-
-  for (const row of rows) {
-    if (!isRecord(row.value)) continue;
-    const record = row.value as Record<string, unknown>;
-
-    const invoiceIdFromRecord = typeof record.invoice_id === 'string' ? record.invoice_id : null;
-    if (!invoiceIdFromRecord) continue;
-
-    reminders.push({
-      id: typeof record.id === 'string' ? record.id : row.key,
-      invoice_id: invoiceIdFromRecord,
-      owner_id: typeof record.owner_id === 'string' ? record.owner_id : ownerId,
-      actor_user_id: typeof record.actor_user_id === 'string' ? record.actor_user_id : '',
-      channel: typeof record.channel === 'string' ? record.channel : 'email',
-      recipient: typeof record.recipient === 'string' ? record.recipient : null,
-      note: typeof record.note === 'string' ? record.note : null,
-      status: record.status === 'pending' || record.status === 'cancelled' ? record.status : 'sent',
-      sent_at: typeof record.sent_at === 'string' ? record.sent_at : null,
-      created_at: typeof record.created_at === 'string' ? record.created_at : new Date(0).toISOString(),
-    });
-  }
-
-  return reminders;
+  return rows.map((row) => ({
+    id: row.id,
+    invoice_id: row.invoice_id,
+    owner_id: row.owner_id,
+    actor_user_id: row.actor_user_id,
+    channel: row.channel,
+    recipient: row.recipient,
+    note: row.note,
+    status: row.status === 'pending' || row.status === 'cancelled' ? row.status : 'sent',
+    sent_at: row.sent_at ? row.sent_at.toISOString() : null,
+    created_at: row.created_at.toISOString(),
+  }));
 }
 
 export function latestSentReminderByInvoice(reminders: InvoiceReminder[]): Map<string, string> {

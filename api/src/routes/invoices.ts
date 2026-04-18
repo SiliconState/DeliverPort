@@ -238,6 +238,179 @@ async function findMatchingTransfer(params: {
   };
 }
 
+interface TransactionReceiptLog {
+  address?: string;
+  topics?: string[];
+  data?: string;
+  blockNumber?: string;
+  logIndex?: string;
+  transactionHash?: string;
+}
+
+interface TransactionReceipt {
+  status?: string;
+  blockNumber?: string;
+  transactionHash?: string;
+  logs?: TransactionReceiptLog[];
+}
+
+interface TxHashVerificationResult {
+  verified: boolean;
+  reason: string;
+  txHash: string;
+  tokenAddress: string;
+  destinationAddress: string;
+  expectedAmountUnits: string;
+  latestBlock: string | null;
+  blockNumber: string | null;
+  confirmations: number | null;
+  matchedLogIndex: string | null;
+}
+
+function parseBooleanInput(value: unknown, field: string): { ok: true; value: boolean } | { ok: false; error: string } {
+  if (typeof value === 'boolean') {
+    return { ok: true, value };
+  }
+
+  return {
+    ok: false,
+    error: `${field} must be a boolean when provided`,
+  };
+}
+
+function envFlagEnabled(raw: string | undefined, defaultValue = false): boolean {
+  if (!raw) return defaultValue;
+
+  const normalized = raw.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return defaultValue;
+}
+
+function defaultRequireTxVerification(): boolean {
+  return envFlagEnabled(process.env.RECONCILE_REQUIRE_TX_VERIFICATION, true);
+}
+
+async function verifyTransferByTxHash(params: {
+  txHash: string;
+  tokenAddress: string;
+  recipientAddress: string;
+  expectedUnits: bigint;
+  minConfirmations: number;
+}): Promise<TxHashVerificationResult> {
+  const receipt = await baseRpc<TransactionReceipt | null>('eth_getTransactionReceipt', [params.txHash]);
+
+  if (!receipt) {
+    return {
+      verified: false,
+      reason: 'tx_not_found',
+      txHash: params.txHash,
+      tokenAddress: params.tokenAddress,
+      destinationAddress: params.recipientAddress,
+      expectedAmountUnits: params.expectedUnits.toString(),
+      latestBlock: null,
+      blockNumber: null,
+      confirmations: null,
+      matchedLogIndex: null,
+    };
+  }
+
+  const txStatus = parseHexBigInt(receipt.status);
+  if (txStatus !== null && txStatus !== 1n) {
+    return {
+      verified: false,
+      reason: 'tx_failed',
+      txHash: params.txHash,
+      tokenAddress: params.tokenAddress,
+      destinationAddress: params.recipientAddress,
+      expectedAmountUnits: params.expectedUnits.toString(),
+      latestBlock: null,
+      blockNumber: receipt.blockNumber || null,
+      confirmations: null,
+      matchedLogIndex: null,
+    };
+  }
+
+  const latestBlockHex = await baseRpc<string>('eth_blockNumber', []);
+  const latestBlock = parseHexBigInt(latestBlockHex);
+  const txBlock = parseHexBigInt(receipt.blockNumber);
+
+  if (latestBlock === null || txBlock === null) {
+    return {
+      verified: false,
+      reason: 'invalid_block_data',
+      txHash: params.txHash,
+      tokenAddress: params.tokenAddress,
+      destinationAddress: params.recipientAddress,
+      expectedAmountUnits: params.expectedUnits.toString(),
+      latestBlock: latestBlock ? toHex(latestBlock) : null,
+      blockNumber: txBlock ? toHex(txBlock) : (receipt.blockNumber || null),
+      confirmations: null,
+      matchedLogIndex: null,
+    };
+  }
+
+  const confirmations = Number(latestBlock >= txBlock ? (latestBlock - txBlock + 1n) : 0n);
+  if (confirmations < Math.max(0, params.minConfirmations)) {
+    return {
+      verified: false,
+      reason: 'insufficient_confirmations',
+      txHash: params.txHash,
+      tokenAddress: params.tokenAddress,
+      destinationAddress: params.recipientAddress,
+      expectedAmountUnits: params.expectedUnits.toString(),
+      latestBlock: toHex(latestBlock),
+      blockNumber: toHex(txBlock),
+      confirmations,
+      matchedLogIndex: null,
+    };
+  }
+
+  const logs = Array.isArray(receipt.logs) ? receipt.logs : [];
+  const normalizedTokenAddress = params.tokenAddress.toLowerCase();
+  const expectedRecipientTopic = addressTopic(params.recipientAddress);
+
+  const matchedLog = logs.find((log) => {
+    if (typeof log.address !== 'string' || log.address.toLowerCase() !== normalizedTokenAddress) return false;
+
+    const topics = Array.isArray(log.topics) ? log.topics : [];
+    if (topics.length < 3) return false;
+    if (topics[0]?.toLowerCase() !== TRANSFER_EVENT_TOPIC.toLowerCase()) return false;
+    if (topics[2]?.toLowerCase() !== expectedRecipientTopic.toLowerCase()) return false;
+
+    const amount = parseHexBigInt(typeof log.data === 'string' ? log.data : undefined);
+    return amount !== null && amount === params.expectedUnits;
+  });
+
+  if (!matchedLog) {
+    return {
+      verified: false,
+      reason: 'transfer_log_not_found',
+      txHash: params.txHash,
+      tokenAddress: params.tokenAddress,
+      destinationAddress: params.recipientAddress,
+      expectedAmountUnits: params.expectedUnits.toString(),
+      latestBlock: toHex(latestBlock),
+      blockNumber: toHex(txBlock),
+      confirmations,
+      matchedLogIndex: null,
+    };
+  }
+
+  return {
+    verified: true,
+    reason: 'verified',
+    txHash: params.txHash,
+    tokenAddress: params.tokenAddress,
+    destinationAddress: params.recipientAddress,
+    expectedAmountUnits: params.expectedUnits.toString(),
+    latestBlock: toHex(latestBlock),
+    blockNumber: toHex(txBlock),
+    confirmations,
+    matchedLogIndex: matchedLog.logIndex ?? null,
+  };
+}
+
 function parseNullableId(value: unknown, field: string, issues: ValidationIssue[]): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
@@ -426,7 +599,7 @@ invoices.get('/:id/reminders', async (c) => {
 
 /**
  * POST /api/invoices/:id/reconcile
- * Reconcile a sent Base invoice by tx hash or automatic on-chain transfer scan.
+ * Reconcile a sent Base invoice by verified tx hash or automatic on-chain transfer scan.
  */
 invoices.post('/:id/reconcile', async (c) => {
   const { userId, role } = c.get('user');
@@ -441,13 +614,33 @@ invoices.post('/:id/reconcile', async (c) => {
     return c.json({ error: 'tx_hash/external_ref must be a string when provided' }, 400);
   }
 
-  const txHash = typeof body.tx_hash === 'string'
+  const txHashInput = typeof body.tx_hash === 'string'
     ? body.tx_hash.trim()
     : (typeof body.external_ref === 'string' ? body.external_ref.trim() : '');
 
-  if (txHash && txHash.length > 255) {
+  if (txHashInput && txHashInput.length > 255) {
     return c.json({ error: 'tx_hash is too long' }, 400);
   }
+
+  if (body.require_verification !== undefined) {
+    const parsedBoolean = parseBooleanInput(body.require_verification, 'require_verification');
+    if (!parsedBoolean.ok) {
+      return c.json({ error: parsedBoolean.error }, 400);
+    }
+  }
+
+  if (body.allow_unverified_tx_hash !== undefined) {
+    const parsedBoolean = parseBooleanInput(body.allow_unverified_tx_hash, 'allow_unverified_tx_hash');
+    if (!parsedBoolean.ok) {
+      return c.json({ error: parsedBoolean.error }, 400);
+    }
+  }
+
+  const requireVerification = body.require_verification === undefined
+    ? defaultRequireTxVerification()
+    : Boolean(body.require_verification);
+
+  const allowUnverifiedTxHash = body.allow_unverified_tx_hash === true;
 
   const lookbackBlocksInput = body.lookback_blocks === undefined ? null : toInteger(body.lookback_blocks);
   if (body.lookback_blocks !== undefined && (lookbackBlocksInput === null || lookbackBlocksInput < 1_000 || lookbackBlocksInput > 500_000)) {
@@ -484,8 +677,104 @@ invoices.post('/:id/reconcile', async (c) => {
     return c.json({ error: 'Only sent invoices can be reconciled' }, 400);
   }
 
-  let reconciledTxHash = txHash || existing.tx_hash;
+  const minConfirmations = minConfirmationsInput ?? parseConfirmationsFromEnv();
+  const txHashPattern = /^0x[a-fA-F0-9]{64}$/;
+  let reconciledTxHash = txHashInput || existing.tx_hash;
   let reconciliation: Record<string, unknown> | null = null;
+
+  if (reconciledTxHash && !txHashPattern.test(reconciledTxHash)) {
+    if (txHashInput) {
+      return c.json({ error: 'tx_hash must be a 0x-prefixed 32-byte hex string' }, 400);
+    }
+    reconciledTxHash = '';
+  }
+
+  if (reconciledTxHash) {
+    const token = resolveInvoiceToken(existing.chain, existing.token, existing.payment_rail);
+    const destinationAddress = normalizeAddress(existing.payment_address);
+
+    if (!token || !destinationAddress) {
+      if (requireVerification && !allowUnverifiedTxHash) {
+        return c.json({
+          error: 'tx_hash verification requires Base USDC/USDT invoices with a valid EVM payment_address',
+          reconciled: false,
+          verified: false,
+          reason: 'unsupported_invoice_for_verification',
+        }, 400);
+      }
+
+      reconciliation = {
+        mode: 'manual_tx_hash_unverified',
+        tx_hash: reconciledTxHash,
+        verification: {
+          verified: false,
+          reason: 'unsupported_invoice_for_verification',
+        },
+      };
+    } else {
+      const expectedUnits = parseTokenUnits(existing.total.toString(), BASE_TOKEN_CONFIG[token].decimals);
+      if (expectedUnits === null || expectedUnits <= 0n) {
+        return c.json({ error: 'Invoice total could not be converted to token units for reconciliation' }, 400);
+      }
+
+      let verification: TxHashVerificationResult;
+      try {
+        verification = await verifyTransferByTxHash({
+          txHash: reconciledTxHash,
+          tokenAddress: BASE_TOKEN_CONFIG[token].address,
+          recipientAddress: destinationAddress,
+          expectedUnits,
+          minConfirmations,
+        });
+      } catch (err) {
+        return c.json({
+          error: 'Failed to verify tx_hash via Base RPC',
+          detail: err instanceof Error ? err.message : 'Unknown RPC error',
+        }, 502);
+      }
+
+      if (!verification.verified) {
+        await safeLogAuditEvent({
+          ownerId: userId,
+          actorId: userId,
+          actorRole: role,
+          action: 'invoice.reconcile.tx_unverified',
+          entityType: 'invoice',
+          entityId: id,
+          summary: 'tx_hash provided but verification did not pass',
+          details: {
+            tx_hash: reconciledTxHash,
+            require_verification: requireVerification,
+            allow_unverified_tx_hash: allowUnverifiedTxHash,
+            verification,
+          },
+        });
+
+        if (requireVerification && !allowUnverifiedTxHash) {
+          return c.json({
+            invoice: existing,
+            reconciled: false,
+            verified: false,
+            reason: verification.reason,
+            message: 'tx_hash verification failed; invoice was not marked paid',
+            verification,
+          }, 409);
+        }
+
+        reconciliation = {
+          mode: 'manual_tx_hash_unverified',
+          tx_hash: reconciledTxHash,
+          verification,
+        };
+      } else {
+        reconciliation = {
+          mode: 'tx_hash_verified',
+          tx_hash: reconciledTxHash,
+          verification,
+        };
+      }
+    }
+  }
 
   if (!reconciledTxHash) {
     const token = resolveInvoiceToken(existing.chain, existing.token, existing.payment_rail);
@@ -506,7 +795,6 @@ invoices.post('/:id/reconcile', async (c) => {
     }
 
     const lookbackBlocks = lookbackBlocksInput ?? parseLookbackFromEnv();
-    const minConfirmations = minConfirmationsInput ?? parseConfirmationsFromEnv();
 
     let transferResult: {
       match: TransferLog | null;
@@ -597,7 +885,7 @@ invoices.post('/:id/reconcile', async (c) => {
     where: { id },
     data: {
       status: 'paid',
-      tx_hash: reconciledTxHash,
+      tx_hash: reconciledTxHash || null,
       paid_at: paidAtIso ? new Date(paidAtIso) : new Date(),
     },
   });
@@ -612,6 +900,8 @@ invoices.post('/:id/reconcile', async (c) => {
     summary: 'Invoice reconciled and marked as paid',
     details: {
       tx_hash: reconciledTxHash,
+      require_verification: requireVerification,
+      allow_unverified_tx_hash: allowUnverifiedTxHash,
       reconciliation: reconciliation ?? { mode: 'manual_tx_hash' },
     },
   });

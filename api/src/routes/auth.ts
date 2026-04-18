@@ -64,7 +64,7 @@ auth.post('/register', async (c) => {
   }
 
   const ip = getClientIp(c);
-  const registerLimit = checkRegisterRateLimit(ip, email);
+  const registerLimit = await checkRegisterRateLimit(ip, email);
   if (!registerLimit.allowed) {
     return c.json({
       error: 'Too many registration attempts. Please try again later.',
@@ -141,7 +141,7 @@ auth.post('/login', async (c) => {
   }
 
   const ip = getClientIp(c);
-  const loginLimit = checkLoginRateLimit(ip, email);
+  const loginLimit = await checkLoginRateLimit(ip, email);
   if (!loginLimit.allowed) {
     return c.json({
       error: 'Too many login attempts. Please slow down and retry.',
@@ -151,7 +151,7 @@ auth.post('/login', async (c) => {
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.password_hash) {
-    const retryAfter = recordLoginFailure(ip, email);
+    const retryAfter = await recordLoginFailure(ip, email);
     return c.json({
       error: 'Invalid email or password',
       retry_after_seconds: retryAfter || undefined,
@@ -159,7 +159,7 @@ auth.post('/login', async (c) => {
   }
 
   if (user.auth_status !== 'active') {
-    const retryAfter = recordLoginFailure(ip, email);
+    const retryAfter = await recordLoginFailure(ip, email);
     return c.json({
       error: 'Account is not active',
       retry_after_seconds: retryAfter || undefined,
@@ -168,14 +168,14 @@ auth.post('/login', async (c) => {
 
   const valid = verifyPassword(body.password, user.password_hash);
   if (!valid) {
-    const retryAfter = recordLoginFailure(ip, email);
+    const retryAfter = await recordLoginFailure(ip, email);
     return c.json({
       error: 'Invalid email or password',
       retry_after_seconds: retryAfter || undefined,
     }, 401);
   }
 
-  clearLoginFailures(ip, email);
+  await clearLoginFailures(ip, email);
 
   // Update last login
   await prisma.user.update({

@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware.js';
-import { listAuditEvents as listAuditEventsV2 } from '../audit-log.js';
-import { listAuditEvents as listLegacyAuditEvents } from '../audit.js';
+import { listAuditEvents } from '../audit-log.js';
 
 const auditEvents = new Hono();
 
@@ -30,57 +29,21 @@ auditEvents.get('/', async (c) => {
   const limit = limitParam ? Number.parseInt(limitParam, 10) : 100;
   const fetchLimit = Math.min(Math.max(limit, 1), 300);
 
-  const [eventsV2, legacyEvents] = await Promise.all([
-    listAuditEventsV2(userId, {
-      limit: fetchLimit,
-      entityType: entityType || undefined,
-      entityId: entityId || undefined,
-      action: action || undefined,
-    }),
-    listLegacyAuditEvents(userId, {
-      limit: fetchLimit,
-      entityType: entityType || undefined,
-      entityId: entityId || undefined,
-      eventType: action || undefined,
-    }),
-  ]);
+  const events = await listAuditEvents(userId, {
+    limit: fetchLimit,
+    entityType: entityType || undefined,
+    entityId: entityId || undefined,
+    action: action || undefined,
+  });
 
-  const normalized = [
-    ...eventsV2.map((event) => ({
+  return c.json({
+    events: events.map((event) => ({
       ...event,
       event_type: event.action,
       message: event.summary,
       metadata: event.details,
     })),
-    ...legacyEvents.map((event) => ({
-      id: event.id,
-      owner_id: event.owner_id,
-      actor_id: event.actor_user_id,
-      actor_role: event.actor_role,
-      action: event.event_type,
-      event_type: event.event_type,
-      entity_type: event.entity_type,
-      entity_id: event.entity_id,
-      summary: event.message,
-      message: event.message,
-      details: event.metadata,
-      metadata: event.metadata,
-      created_at: event.created_at,
-    })),
-  ];
-
-  normalized.sort((a, b) => b.created_at.localeCompare(a.created_at));
-
-  const deduped = new Map<string, (typeof normalized)[number]>();
-  for (const event of normalized) {
-    if (!deduped.has(event.id)) {
-      deduped.set(event.id, event);
-    }
-  }
-
-  const events = Array.from(deduped.values()).slice(0, fetchLimit);
-
-  return c.json({ events });
+  });
 });
 
 export default auditEvents;

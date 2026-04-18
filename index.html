@@ -2347,6 +2347,32 @@ const Toast = {
   }
 };
 
+const SessionNotice = {
+  _seen: new Set(),
+  _key(key) { return `deliverport_notice_once::${key}`; },
+  seen(key) {
+    if (!key) return false;
+    if (this._seen.has(key)) return true;
+    try {
+      return sessionStorage.getItem(this._key(key)) === '1';
+    } catch {
+      return false;
+    }
+  },
+  mark(key) {
+    if (!key) return;
+    this._seen.add(key);
+    try { sessionStorage.setItem(this._key(key), '1'); } catch { /* ignore */ }
+  },
+  toastOnce(key, message, kind = 'err') {
+    if (!message) return false;
+    if (this.seen(key)) return false;
+    this.mark(key);
+    Toast.show(message, kind);
+    return true;
+  },
+};
+
 const Modal = {
   open(title, innerHtml, opts={}) {
     const root = document.getElementById('modal-root');
@@ -2522,9 +2548,9 @@ function invoiceStatusTone(inv) {
 function invoiceStatusNote(inv) {
   if (!inv) return '';
   if (invoiceIsOverdue(inv)) return `Payment overdue since ${U.fmtDay(inv.due_at)}.`;
-  if (inv.status === 'draft') return 'Internal draft - not visible to clients yet.';
-  if (inv.status === 'sent') return inv.due_at ? `Awaiting payment by ${U.fmtDay(inv.due_at)}.` : 'Sent to client and awaiting payment.';
-  if (inv.status === 'paid') return inv.paid_at ? `Paid ${U.fmtDay(inv.paid_at)}.` : 'Payment recorded.';
+  if (inv.status === 'draft') return 'Internal draft — not visible to clients yet.';
+  if (inv.status === 'sent') return inv.due_at ? `Awaiting client payment by ${U.fmtDay(inv.due_at)}.` : 'Sent to client and awaiting payment.';
+  if (inv.status === 'paid') return inv.paid_at ? `Marked paid ${U.fmtDay(inv.paid_at)}.` : 'Marked paid.';
   return '';
 }
 
@@ -2610,14 +2636,14 @@ function formatAuditEventLabel(event) {
 
 function renderInvoicePrimaryAction(inv) {
   if (!inv) return '';
-  if (inv.status === 'draft') return `<button class="btn btn-primary text-xs" data-inv-status="${inv.id}" data-next="sent">${I.export}<span>Mark sent</span></button>`;
-  if (inv.status === 'sent') return `<button class="btn btn-primary text-xs" data-inv-status="${inv.id}" data-next="paid">${I.check}<span>Record payment</span></button>`;
+  if (inv.status === 'draft') return `<button class="btn btn-primary text-xs" data-inv-status="${inv.id}" data-next="sent">${I.export}<span>Send to client</span></button>`;
+  if (inv.status === 'sent') return `<button class="btn btn-primary text-xs" data-inv-status="${inv.id}" data-next="paid">${I.check}<span>Mark paid manually</span></button>`;
   return `<span class="text-xs" style="color:var(--ink-muted)">${U.esc(invoiceStatusNote(inv))}</span>`;
 }
 
 function renderInvoicePaymentBlock(inv, { compact = false } = {}) {
   const due = inv?.due_at ? U.fmtDay(inv.due_at) : '-';
-  const copyBtn = inv?.payment_address ? `<button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.payment_address)}">${I.copy}<span>Copy address</span></button>` : '';
+  const copyBtn = inv?.payment_address ? `<button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.payment_address)}">${I.copy}<span>Copy payment address</span></button>` : '';
   return `
     <div class="space-y-2">
       <div class="flex items-center gap-2 flex-wrap">
@@ -3837,7 +3863,7 @@ Pages.billing = async () => {
         <div>
           <div class="eyebrow">Revenue</div>
           <h1 class="h1">Billing + payments</h1>
-          <p class="text-sm mt-3" style="color:var(--ink-muted)">Create safer invoices, keep payment instructions clear, and move drafts to sent or paid with explicit confirmation.</p>
+          <p class="text-sm mt-3" style="color:var(--ink-muted)">Create draft invoices, send them when ready, then mark paid manually or auto-reconcile on-chain transfers.</p>
         </div>
         <div class="flex gap-2 flex-wrap">
           <a class="btn" href="#/settings">${I.wallet}<span>Settings</span></a>
@@ -3867,7 +3893,7 @@ Pages.billing = async () => {
           <div>
             <div class="eyebrow">Reminders</div>
             <h2 class="h2">Due + overdue follow-ups</h2>
-            <div class="text-sm mt-1" style="color:var(--ink-muted)">Review reminder candidates and mark outreach events as sent.</div>
+            <div class="text-sm mt-1" style="color:var(--ink-muted)">Review reminder candidates and log follow-ups you already sent (email/SMS/WhatsApp).</div>
           </div>
           ${DataLayer.isApi() ? `<span class="chip chip-indigo"><span class="chip-dot"></span>API assist</span>` : `<span class="chip"><span class="chip-dot"></span>Local mode</span>`}
         </div>
@@ -3892,16 +3918,16 @@ Pages.billing = async () => {
                     </div>
                     <div class="min-w-[170px] text-right">
                       ${!reminderFeed.unsupported
-                        ? `<button class="btn btn-primary text-xs" data-inv-remind="${inv.id}">${I.export}<span>Mark reminder sent</span></button>`
-                        : `<span class="text-xs" style="color:var(--ink-faint)">${U.esc(DataLayer.isApi() ? 'Upgrade backend to send reminders' : 'API mode required to send reminders')}</span>`}
+                        ? `<button class="btn btn-primary text-xs" data-inv-remind="${inv.id}">${I.export}<span>Log reminder sent</span></button>`
+                        : `<span class="text-xs" style="color:var(--ink-faint)">${U.esc(DataLayer.isApi() ? 'Reminder logging unavailable on this backend' : 'API mode required for reminder logging')}</span>`}
                     </div>
                   </div>`;
               }).join('')}</div>`
             : `<div class="text-sm" style="color:var(--ink-muted)">No due or overdue reminder candidates right now.</div>`}
         ${reminderFeed.unsupported
           ? `<div class="text-xs" style="color:var(--ink-faint)">${U.esc(reminderFeed.reason === 'local_mode'
-            ? 'Showing local reminder candidates. Connect API mode to log reminders.'
-            : 'This backend does not expose /api/invoices/reminders yet. Showing fallback reminder candidates.')}</div>`
+            ? 'Showing local reminder candidates only. Connect API mode to log reminder activity.'
+            : 'Reminder endpoints are unavailable on this backend. Showing fallback reminder candidates for this session.')}</div>`
           : ''}
       </section>
 
@@ -3910,7 +3936,7 @@ Pages.billing = async () => {
           <div>
             <div class="eyebrow">Invoices</div>
             <h2 class="h2">All invoices</h2>
-            <div class="text-sm mt-1" style="color:var(--ink-muted)">Drafts stay internal until you mark them sent. Paid invoices remain here as your billing history.</div>
+            <div class="text-sm mt-1" style="color:var(--ink-muted)">Drafts stay internal until you send them. For sent invoices, mark paid manually or auto-reconcile on-chain.</div>
           </div>
           <button class="btn" id="new-invoice-btn-2">${I.plus}<span>New invoice</span></button>
         </div>
@@ -3938,9 +3964,9 @@ Pages.billing = async () => {
                     <div class="flex gap-2 flex-wrap justify-end mt-3">
                       ${renderInvoicePrimaryAction(inv)}
                       ${DataLayer.isApi() && inv.status === 'sent' && isOnChainRail(inv.provider)
-                        ? `<button class="btn btn-ghost text-xs" data-inv-reconcile="${inv.id}">${I.check}<span>Reconcile on-chain</span></button>`
+                        ? `<button class="btn btn-ghost text-xs" data-inv-reconcile="${inv.id}">${I.check}<span>Auto-reconcile on-chain</span></button>`
                         : ''}
-                      ${inv.payment_address ? `<button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.payment_address)}">${I.copy}<span>Copy address</span></button>` : ''}
+                      ${inv.payment_address ? `<button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.payment_address)}">${I.copy}<span>Copy payment address</span></button>` : ''}
                       ${inv.status === 'draft' ? `<button class="btn btn-ghost text-xs" data-inv-delete="${inv.id}" style="color:var(--danger)">Delete draft</button>` : ''}
                     </div>
                   </div>
@@ -4372,8 +4398,8 @@ Pages.billing.mount = () => {
 
   document.querySelectorAll('[data-inv-status]').forEach(btn => btn.addEventListener('click', async () => {
     const next = btn.dataset.next;
-    if (next === 'paid' && !confirm('Record payment for this invoice and mark it paid?')) return;
-    if (next === 'sent' && !confirm('Mark this draft invoice as sent? It will become visible in client-facing views.')) return;
+    if (next === 'paid' && !confirm('Mark this invoice as paid manually? Use auto-reconcile if you want to detect an on-chain transfer instead.')) return;
+    if (next === 'sent' && !confirm('Send this draft invoice to the client? It will become visible in portal/share views.')) return;
     await Revenue.setInvoiceStatus(btn.dataset.invStatus, next);
     Toast.show(next === 'paid' ? 'Invoice marked paid' : 'Invoice marked sent');
     await router.render();
@@ -4385,7 +4411,10 @@ Pages.billing.mount = () => {
     await router.render();
   }));
   document.querySelectorAll('[data-inv-reconcile]').forEach(btn => btn.addEventListener('click', async () => {
-    if (!DataLayer.isApi()) { Toast.show('Reconcile requires API mode', 'err'); return; }
+    if (!DataLayer.isApi()) {
+      SessionNotice.toastOnce('reconcile_requires_api_mode', 'Reconcile requires API mode.', 'err');
+      return;
+    }
     const invoiceId = btn.dataset.invReconcile;
     const original = btn.innerHTML;
     btn.disabled = true;
@@ -4393,7 +4422,7 @@ Pages.billing.mount = () => {
     try {
       const result = await Revenue.reconcileInvoice(invoiceId);
       if (result?.unsupported) {
-        Toast.show('Reconcile endpoint is unavailable on this backend', 'err');
+        SessionNotice.toastOnce('unsupported_reconcile_endpoint', 'Reconcile endpoint is unavailable on this backend.', 'err');
         return;
       }
       Toast.show('Reconciliation complete');
@@ -4406,8 +4435,11 @@ Pages.billing.mount = () => {
     }
   }));
   document.querySelectorAll('[data-inv-remind]').forEach(btn => btn.addEventListener('click', async () => {
-    if (!DataLayer.isApi()) { Toast.show('Reminders require API mode', 'err'); return; }
-    if (!confirm('Mark reminder as sent for this invoice?')) return;
+    if (!DataLayer.isApi()) {
+      SessionNotice.toastOnce('reminders_require_api_mode', 'Reminders require API mode.', 'err');
+      return;
+    }
+    if (!confirm('Log this reminder as sent for this invoice? This does not send a message.')) return;
     const invoiceId = btn.dataset.invRemind;
     const original = btn.innerHTML;
     btn.disabled = true;
@@ -4415,10 +4447,10 @@ Pages.billing.mount = () => {
     try {
       const result = await Revenue.markReminderSent(invoiceId, { source: 'billing-ui' });
       if (result?.unsupported) {
-        Toast.show('Reminder endpoint is unavailable on this backend', 'err');
+        SessionNotice.toastOnce('unsupported_reminders_endpoint', 'Reminder endpoint is unavailable on this backend.', 'err');
         return;
       }
-      Toast.show('Reminder marked sent');
+      Toast.show('Reminder activity logged');
       await router.render();
     } catch (err) {
       Toast.show(err.message || String(err), 'err');
@@ -4456,7 +4488,7 @@ Pages.portal = async () => {
         <div>
           <div class="eyebrow">Client portal</div>
           <h1 class="h1">${U.esc(client?.name || me.name)}</h1>
-          <p class="text-sm mt-2 max-w-2xl" style="color:var(--ink-muted)">Track project progress, review deliverables, and handle invoices with clear payment details.</p>
+          <p class="text-sm mt-2 max-w-2xl" style="color:var(--ink-muted)">Track project progress, approve delivered work, and pay invoices using clear wallet-ready payment details.</p>
         </div>
       </header>
 
@@ -4470,6 +4502,7 @@ Pages.portal = async () => {
       ${outstandingInvoices.length ? `<section class="card p-6">
         <div class="eyebrow">Payment due</div>
         <h2 class="h2 mt-1">Outstanding invoices</h2>
+        <div class="text-sm mt-1" style="color:var(--ink-muted)">Use the payment block below to copy exact wallet details before paying.</div>
         <div class="divide-hair mt-4">
           ${outstandingInvoices.map(inv => `
             <div class="py-4 flex items-start justify-between gap-4 flex-wrap">
@@ -4480,7 +4513,7 @@ Pages.portal = async () => {
               </div>
               <div class="text-right min-w-[180px]">
                 <div class="font-mono text-lg">${U.fmtMoney(inv.amount, inv.currency || 'USD')}</div>
-                <button class="btn btn-ghost mt-3" data-copy="${U.esc(inv.amount)} ${U.esc(inv.currency || 'USD')}">${I.copy}<span>Copy amount</span></button>
+                <button class="btn btn-ghost mt-3" data-copy="${U.esc(inv.amount)} ${U.esc(inv.currency || 'USD')}">${I.copy}<span>Copy amount due</span></button>
               </div>
             </div>`).join('')}
         </div>
@@ -4531,7 +4564,7 @@ Pages.portal = async () => {
                 </div>
                 ${canSubmitApproval ? `
                   <div class="card-flat p-3 space-y-2">
-                    <div class="text-xs" style="color:var(--ink-muted)">Approve this deliverable or request changes.</div>
+                    <div class="text-xs" style="color:var(--ink-muted)">Approve this deliverable or request changes. Your note is shared with the operator.</div>
                     <input class="field" data-del-approval-note="${U.esc(approvalKey)}" placeholder="Optional note for your operator" value="${U.esc(d.approval_note || '')}" />
                     <div class="flex gap-2 flex-wrap">
                       <button class="btn btn-primary text-xs" data-del-approval-project="${U.esc(project.id)}" data-del-approval-id="${U.esc(deliverableId)}" data-decision="approved" data-note-key="${U.esc(approvalKey)}">${I.check}<span>Approve</span></button>
@@ -4576,7 +4609,7 @@ Pages.portal.mount = () => {
 
   document.querySelectorAll('[data-del-approval-project]').forEach(btn => btn.addEventListener('click', async () => {
     if (!DataLayer.isApi()) {
-      Toast.show('Approval actions require API mode', 'err');
+      SessionNotice.toastOnce('approval_requires_api_mode', 'Approval actions require API mode.', 'err');
       return;
     }
     const projectId = btn.dataset.delApprovalProject;
@@ -4597,7 +4630,12 @@ Pages.portal.mount = () => {
       Toast.show(decision === 'approved' ? 'Deliverable approved' : 'Change request sent');
       await router.render();
     } catch (err) {
-      Toast.show(err.message || String(err), 'err');
+      const message = err?.message || String(err);
+      if (/not enabled on this API yet/i.test(message)) {
+        SessionNotice.toastOnce('unsupported_approval_endpoint', message, 'err');
+      } else {
+        Toast.show(message, 'err');
+      }
     } finally {
       btn.disabled = false;
       btn.innerHTML = original;
@@ -4673,6 +4711,7 @@ Pages.share = async () => {
       ${outstandingInvoices.length ? `<section class="card p-6">
         <div class="eyebrow">Payment</div>
         <h2 class="h2 mt-1">Outstanding invoices</h2>
+        <div class="text-sm mt-1" style="color:var(--ink-muted)">Pay from your wallet app or copy details for manual transfer.</div>
         <div class="divide-hair mt-4">
           ${outstandingInvoices.map(inv => {
             const token = inv.token || 'USDC';
@@ -4699,9 +4738,9 @@ Pages.share = async () => {
                     </button>
                   ` : ''}
                   ${isOnChain ? `
-                    <a href="${U.esc(payLink)}" class="btn ${hasWallet ? 'btn-ghost' : 'btn-primary'} text-xs" target="_blank" rel="noopener">${I.wallet}<span>Open in wallet app</span></a>
+                    <a href="${U.esc(payLink)}" class="btn ${hasWallet ? 'btn-ghost' : 'btn-primary'} text-xs" target="_blank" rel="noopener">${I.wallet}<span>Open wallet payment link</span></a>
                   ` : ''}
-                  <button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.amount)} ${U.esc(inv.currency || 'USD')}">${I.copy}<span>Copy amount</span></button>
+                  <button class="btn btn-ghost text-xs" data-copy="${U.esc(inv.amount)} ${U.esc(inv.currency || 'USD')}">${I.copy}<span>Copy amount due</span></button>
                 </div>
                 <div class="pay-status hidden card-flat p-3 mt-3 text-left text-xs" data-pay-status="${inv.id}"></div>
               </div>

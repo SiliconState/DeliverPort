@@ -12,7 +12,7 @@ import {
   type JsonObject,
   type ValidationIssue,
 } from '../validation.js';
-import { logAuditEvent } from '../audit.js';
+import { safeLogAuditEvent } from '../audit-log.js';
 
 const projects = new Hono();
 
@@ -161,20 +161,18 @@ projects.post('/', async (c) => {
     },
   });
 
-  await logAuditEvent({
+  await safeLogAuditEvent({
     ownerId: userId,
-    actorUserId: userId,
+    actorId: userId,
     actorRole: auth.role,
-    eventType: 'project.created',
+    action: 'project.created',
     entityType: 'project',
     entityId: project.id,
-    message: 'Project created',
-    metadata: {
+    summary: 'Project created',
+    details: {
       project_name: project.name,
       client_id: project.client_id,
     },
-  }).catch((err) => {
-    console.warn('[audit] failed to log project create event', err);
   });
 
   return c.json({ project }, 201);
@@ -283,22 +281,20 @@ const handleDeliverableApproval = async (c: Context) => {
     },
   });
 
-  await logAuditEvent({
+  await safeLogAuditEvent({
     ownerId: updated.owner_id,
-    actorUserId: auth.userId,
+    actorId: auth.userId,
     actorRole: auth.role,
-    eventType: 'project.deliverable.approval',
+    action: 'project.deliverable.approval',
     entityType: 'project',
     entityId: project.id,
-    message: `Deliverable ${deliverableRef} ${decision}`,
-    metadata: {
+    summary: `Deliverable ${deliverableRef} ${decision}`,
+    details: {
       deliverable_ref: deliverableRef,
       deliverable_index: deliverableIndex,
       decision,
       note: note ?? '',
     },
-  }).catch((err) => {
-    console.warn('[audit] failed to log deliverable approval', err);
   });
 
   const updatedDeliverables = cloneDeliverables(updated.deliverables);
@@ -422,16 +418,14 @@ projects.put('/:id', async (c) => {
     data: updateData,
   });
 
-  await logAuditEvent({
+  await safeLogAuditEvent({
     ownerId: userId,
-    actorUserId: userId,
+    actorId: userId,
     actorRole: auth.role,
-    eventType: 'project.updated',
+    action: 'project.updated',
     entityType: 'project',
     entityId: project.id,
-    message: 'Project updated',
-  }).catch((err) => {
-    console.warn('[audit] failed to log project update event', err);
+    summary: 'Project updated',
   });
 
   return c.json({ project });
@@ -455,16 +449,14 @@ projects.delete('/:id', async (c) => {
 
   await prisma.project.delete({ where: { id } });
 
-  await logAuditEvent({
+  await safeLogAuditEvent({
     ownerId: userId,
-    actorUserId: userId,
+    actorId: userId,
     actorRole: auth.role,
-    eventType: 'project.deleted',
+    action: 'project.deleted',
     entityType: 'project',
     entityId: id,
-    message: 'Project deleted',
-  }).catch((err) => {
-    console.warn('[audit] failed to log project delete event', err);
+    summary: 'Project deleted',
   });
 
   return c.json({ success: true });

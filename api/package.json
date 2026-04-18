@@ -12,7 +12,9 @@
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --environment=node",
+    "test:watch": "vitest --environment=node"
   },
   "keywords": ["deliverport", "api", "hono", "prisma"],
   "author": "",
@@ -21,6 +23,7 @@
     "@hono/node-server": "^1.14.3",
     "@prisma/client": "^6.6.0",
     "hono": "^4.7.9",
+    "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
     "prisma": "^6.6.0"
   },
@@ -28,6 +31,7 @@
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.15.3",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.9"
   }
 }

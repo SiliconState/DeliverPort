@@ -6,8 +6,6 @@ const TENANT_KEY_PREFIX = 'u';
 
 export const TENANT_NAMESPACES = {
   meta: 'meta',
-  audit: 'audit',
-  reminder: 'reminder',
 } as const;
 
 export type TenantNamespace = (typeof TENANT_NAMESPACES)[keyof typeof TENANT_NAMESPACES];

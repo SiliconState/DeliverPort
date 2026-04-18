@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
 import { authMiddleware } from '../middleware.js';
-import { logAuditEvent } from '../audit.js';
+import { safeLogAuditEvent } from '../audit-log.js';
 import {
   parseJsonBody,
   readStringArrayField,
@@ -120,16 +120,14 @@ meta.put('/:key', async (c) => {
     return upserted;
   });
 
-  await logAuditEvent({
+  await safeLogAuditEvent({
     ownerId: userId,
-    actorUserId: userId,
+    actorId: userId,
     actorRole: auth.role,
-    eventType: 'meta.updated',
+    action: 'meta.updated',
     entityType: 'meta',
     entityId: key,
-    message: `Updated meta key ${key}`,
-  }).catch((err) => {
-    console.warn('[audit] failed to log meta update event', err);
+    summary: `Updated meta key ${key}`,
   });
 
   return c.json({
@@ -186,19 +184,17 @@ meta.post('/delete', async (c) => {
     },
   });
 
-  await logAuditEvent({
+  await safeLogAuditEvent({
     ownerId: userId,
-    actorUserId: userId,
+    actorId: userId,
     actorRole: auth.role,
-    eventType: 'meta.deleted',
+    action: 'meta.deleted',
     entityType: 'meta',
     entityId: null,
-    message: `Deleted ${result.count} meta keys`,
-    metadata: {
+    summary: `Deleted ${result.count} meta keys`,
+    details: {
       deleted_keys: normalizedKeys,
     },
-  }).catch((err) => {
-    console.warn('[audit] failed to log meta delete event', err);
   });
 
   return c.json({ success: true, deleted: result.count });
