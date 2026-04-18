@@ -413,6 +413,10 @@ const CONFIG = {
     payouts: ['USDC (Base)', 'USDT (Base)', 'Manual'],
   },
   defaultCurrency: 'USD',
+  // On production pages, default to the hosted API unless the user explicitly forced local mode.
+  defaultApiOriginByHost: {
+    'siliconstate.github.io': 'https://deliverport-api-production.up.railway.app',
+  },
 
   // Freemium tiers
   plans: {
@@ -1135,13 +1139,26 @@ const DataLayer = {
   mode: 'local', // 'local' | 'api'
 
   init() {
-    const apiUrl = new URL(window.location.href).searchParams.get('api')
-                   || localStorage.getItem('deliverport_api_url');
-    if (apiUrl) {
-      this.mode = 'api';
-      localStorage.setItem('deliverport_api_url', apiUrl);
-      ApiClient.init(apiUrl);
+    const url = new URL(window.location.href);
+    const explicitApiUrl = url.searchParams.get('api');
+    const forceLocalFromUrl = ['1', 'true', 'yes'].includes(String(url.searchParams.get('local') || '').toLowerCase());
+    const forceLocalStored = localStorage.getItem('deliverport_force_local') === '1';
+    const forceLocal = forceLocalFromUrl || forceLocalStored;
+    const persistedApiUrl = localStorage.getItem('deliverport_api_url');
+    const hostDefaultApiUrl = CONFIG.defaultApiOriginByHost?.[window.location.hostname] || null;
+
+    if (forceLocalFromUrl) {
+      localStorage.setItem('deliverport_force_local', '1');
+      localStorage.removeItem('deliverport_api_url');
     }
+
+    const apiUrl = explicitApiUrl || (!forceLocal ? (persistedApiUrl || hostDefaultApiUrl) : null);
+    if (!apiUrl) return;
+
+    this.mode = 'api';
+    localStorage.setItem('deliverport_api_url', apiUrl);
+    localStorage.removeItem('deliverport_force_local');
+    ApiClient.init(apiUrl);
   },
 
   isApi()   { return this.mode === 'api'; },
@@ -1154,10 +1171,12 @@ const DataLayer = {
   async setApiUrl(url) {
     if (url) {
       localStorage.setItem('deliverport_api_url', url);
+      localStorage.removeItem('deliverport_force_local');
       this.mode = 'api';
       ApiClient.init(url);
     } else {
       localStorage.removeItem('deliverport_api_url');
+      localStorage.setItem('deliverport_force_local', '1');
       localStorage.removeItem('deliverport_jwt');
       this.mode = 'local';
     }
