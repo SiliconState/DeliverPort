@@ -14,6 +14,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
+<!-- Warm API origin early for faster first authenticated request on GitHub Pages -->
+<link rel="preconnect" href="https://deliverport-api-production.up.railway.app" crossorigin>
+<link rel="dns-prefetch" href="https://deliverport-api-production.up.railway.app">
+
 <!-- Tailwind Play CDN (MVP - swap for build later) -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
 <script>
@@ -956,6 +960,79 @@ const ApiClient = {
   init(baseUrl) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.token = localStorage.getItem('deliverport_jwt') || null;
+    this.prefetchOrigin(this.baseUrl);
+  },
+
+  prefetchOrigin(url) {
+    try {
+      const origin = new URL(url).origin;
+      const head = document.head || document.querySelector('head');
+      if (!head) return;
+
+      if (!head.querySelector(`link[data-api-preconnect="${origin}"]`)) {
+        const preconnect = document.createElement('link');
+        preconnect.rel = 'preconnect';
+        preconnect.href = origin;
+        preconnect.crossOrigin = 'anonymous';
+        preconnect.dataset.apiPreconnect = origin;
+        head.appendChild(preconnect);
+      }
+
+      if (!head.querySelector(`link[data-api-dns="${origin}"]`)) {
+        const dnsPrefetch = document.createElement('link');
+        dnsPrefetch.rel = 'dns-prefetch';
+        dnsPrefetch.href = origin;
+        dnsPrefetch.dataset.apiDns = origin;
+        head.appendChild(dnsPrefetch);
+      }
+    } catch {
+      // ignore invalid URLs
+    }
+  },
+
+  bootstrapCacheKey() {
+    const tokenHint = this.token ? this.token.slice(0, 24) : 'anon';
+    return `deliverport_bootstrap_cache::${this.baseUrl}::${tokenHint}`;
+  },
+
+  readBootstrapCache(maxAgeMs = 45000) {
+    try {
+      const raw = sessionStorage.getItem(this.bootstrapCacheKey());
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const ts = parsed?.savedAt ? Date.parse(parsed.savedAt) : NaN;
+      if (!Number.isFinite(ts)) return null;
+      if (Date.now() - ts > maxAgeMs) return null;
+      return parsed.payload || null;
+    } catch {
+      return null;
+    }
+  },
+
+  writeBootstrapCache(payload) {
+    try {
+      if (!payload || typeof payload !== 'object') return;
+      sessionStorage.setItem(this.bootstrapCacheKey(), JSON.stringify({
+        savedAt: new Date().toISOString(),
+        payload,
+      }));
+    } catch {
+      // ignore storage quota issues
+    }
+  },
+
+  clearBootstrapCache() {
+    try {
+      const prefix = 'deliverport_bootstrap_cache::';
+      const keys = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith(prefix)) keys.push(key);
+      }
+      keys.forEach((k) => sessionStorage.removeItem(k));
+    } catch {
+      // ignore storage access issues
+    }
   },
 
   headers(extra = {}) {
@@ -966,12 +1043,14 @@ const ApiClient = {
 
   async _fetch(method, path, body = null) {
     const url = `${this.baseUrl}${path}`;
-    const opts = { method, headers: this.headers() };
+    const opts = { method, headers: this.headers(), cache: 'no-store' };
     if (body !== null) opts.body = JSON.stringify(body);
     const res = await fetch(url, opts);
     if (res.status === 401) {
       this.token = null;
+      this.clearBootstrapCache();
       localStorage.removeItem('deliverport_jwt');
+      localStorage.removeItem('deliverport_auth_user_id');
       location.hash = '#/login';
       throw new Error('Session expired - please sign in again');
     }
@@ -1042,22 +1121,41 @@ const ApiClient = {
   async signIn(email, password) {
     const data = await this.post('/api/auth/login', { email, password });
     this.token = data.token;
+    this.clearBootstrapCache();
     localStorage.setItem('deliverport_jwt', data.token);
     return data.user;
   },
   async signOut() {
     this.token = null;
+    this.clearBootstrapCache();
     localStorage.removeItem('deliverport_jwt');
+    localStorage.removeItem('deliverport_auth_user_id');
   },
   async register({ name, email, password, role = 'operator', wallet_address = '' }) {
     const data = await this.post('/api/auth/register', { name, email, password, role, wallet_address });
     this.token = data.token;
+    this.clearBootstrapCache();
     localStorage.setItem('deliverport_jwt', data.token);
     return data.user;
   },
   async me() {
     const data = await this.get('/api/auth/me');
     return data.user || data;
+  },
+
+  // ── Bootstrap (single startup payload) ──
+  async getBootstrap() {
+    const r = await this.get('/api/bootstrap');
+    const invoices = Array.isArray(r.invoices) ? r.invoices.map(inv => this.mapInvoiceFromApi(inv)) : [];
+    const payoutRunsRaw = r.payout_runs || r.payoutRuns || [];
+    const payoutRuns = Array.isArray(payoutRunsRaw)
+      ? payoutRunsRaw.map(run => this.mapPayoutRunFromApi(run))
+      : [];
+    return {
+      ...r,
+      invoices,
+      payoutRuns,
+    };
   },
 
   // ── Clients ──
@@ -1174,10 +1272,13 @@ const DataLayer = {
       localStorage.removeItem('deliverport_force_local');
       this.mode = 'api';
       ApiClient.init(url);
+      ApiClient.clearBootstrapCache();
     } else {
       localStorage.removeItem('deliverport_api_url');
       localStorage.setItem('deliverport_force_local', '1');
+      ApiClient.clearBootstrapCache();
       localStorage.removeItem('deliverport_jwt');
+      localStorage.removeItem('deliverport_auth_user_id');
       this.mode = 'local';
     }
   },
@@ -1320,62 +1421,124 @@ const Store = {
   },
   subs: new Set(),
 
-  async rehydrate() {
+  async rehydrate(opts = {}) {
+    const { preferBootstrapCache = false } = opts || {};
+
     if (DataLayer.isApi()) {
-      try {
-        const [clients, projects, invoices, payoutRuns, users, metaArr] = await Promise.all([
-          ApiClient.getClients().catch(() => []),
-          ApiClient.getProjects().catch(() => []),
-          ApiClient.getInvoices().catch(() => []),
-          ApiClient.getPayoutRuns().catch(() => []),
-          ApiClient.getUsers().catch(() => []),
-          ApiClient.getMeta().catch(() => []),
-        ]);
-        const metaMap = Array.isArray(metaArr)
-          ? Object.fromEntries(metaArr.map(r => [r.key, r.value]))
-          : (metaArr || {});
-        // Merge locally-stored prefs (theme, currency) with server meta
-        const localTheme = localStorage.getItem('deliverport_theme');
-        const localCurrency = localStorage.getItem('deliverport_display_currency');
+      const localTheme = localStorage.getItem('deliverport_theme');
+      const localCurrency = localStorage.getItem('deliverport_display_currency');
+
+      const applyApiSnapshot = (snapshot = {}) => {
+        const clients = snapshot.clients || [];
+        const projects = snapshot.projects || [];
+        const invoices = snapshot.invoices || [];
+        const payoutRuns = snapshot.payoutRuns || snapshot.payout_runs || [];
+        const users = snapshot.users || [];
+        const metaRaw = snapshot.meta || [];
+        const metaMap = Array.isArray(metaRaw)
+          ? Object.fromEntries(metaRaw.map(r => [r.key, r.value]))
+          : (metaRaw || {});
+
         const localAuthUserId = localStorage.getItem('deliverport_auth_user_id');
+        const authFromServer = snapshot.auth?.userId || snapshot.auth_user_id || null;
+        if (!localAuthUserId && authFromServer) {
+          localStorage.setItem('deliverport_auth_user_id', authFromServer);
+        }
+
         this.state = {
-          clients: clients || [],
-          projects: (projects || []).map(normalizeProject),
-          invoices: (invoices || []).map(normalizeInvoice),
-          payoutRuns: (payoutRuns || []).map(normalizePayoutRun),
-          users: users || [],
-          authUserId: localAuthUserId || metaMap.auth_user_id || null,
-          currentUserId: localAuthUserId || metaMap.current_user || metaMap.auth_user_id || null,
+          clients,
+          projects: projects.map(normalizeProject),
+          invoices: invoices.map(normalizeInvoice),
+          payoutRuns: payoutRuns.map(normalizePayoutRun),
+          users,
+          authUserId: localAuthUserId || authFromServer || metaMap.auth_user_id || null,
+          currentUserId: localAuthUserId || metaMap.current_user || authFromServer || metaMap.auth_user_id || null,
           theme: localTheme || metaMap.theme || 'light',
           displayCurrency: localCurrency || metaMap.display_currency || CONFIG.defaultCurrency || 'USD',
           meta: metaMap,
         };
+        this.emit();
+      };
+
+      if (!ApiClient.token) {
+        this.state = {
+          clients: [],
+          projects: [],
+          invoices: [],
+          payoutRuns: [],
+          users: [],
+          authUserId: null,
+          currentUserId: null,
+          theme: localTheme || 'light',
+          displayCurrency: localCurrency || CONFIG.defaultCurrency || 'USD',
+          meta: {},
+        };
+        this.emit();
+        return;
+      }
+
+      if (preferBootstrapCache) {
+        const cachedSnapshot = ApiClient.readBootstrapCache(45000);
+        if (cachedSnapshot) applyApiSnapshot(cachedSnapshot);
+      }
+
+      try {
+        let snapshot;
+        try {
+          snapshot = await ApiClient.getBootstrap();
+        } catch (bootstrapErr) {
+          const message = String(bootstrapErr?.message || '');
+          const sessionError = /session expired|401/i.test(message);
+          if (sessionError) throw bootstrapErr;
+
+          // Backward compatibility for older API deployments that don't expose /api/bootstrap yet.
+          const [clients, projects, invoices, payoutRuns, users, meta] = await Promise.all([
+            ApiClient.getClients().catch(() => []),
+            ApiClient.getProjects().catch(() => []),
+            ApiClient.getInvoices().catch(() => []),
+            ApiClient.getPayoutRuns().catch(() => []),
+            ApiClient.getUsers().catch(() => []),
+            ApiClient.getMeta().catch(() => []),
+          ]);
+          snapshot = {
+            clients,
+            projects,
+            invoices,
+            payoutRuns,
+            users,
+            meta,
+          };
+        }
+
+        ApiClient.writeBootstrapCache(snapshot);
+        applyApiSnapshot(snapshot);
       } catch (e) {
         console.warn('[Store] API rehydrate failed:', e.message);
       }
-    } else {
-      const [clients, projects, invoices, payoutRuns, users, meta] = await Promise.all([
-        DB.query(`SELECT * FROM clients ORDER BY created_at, name`),
-        DB.query(`SELECT * FROM projects ORDER BY created_at, name`),
-        DB.query(`SELECT * FROM invoices ORDER BY issued_at DESC`),
-        DB.query(`SELECT * FROM payout_runs ORDER BY created_at DESC`),
-        DB.query(`SELECT * FROM users ORDER BY joined_at`),
-        DB.query(`SELECT key, value FROM meta`),
-      ]);
-      const metaMap = Object.fromEntries(meta.map(r => [r.key, r.value]));
-      this.state = {
-        clients,
-        projects: projects.map(normalizeProject),
-        invoices: invoices.map(normalizeInvoice),
-        payoutRuns: payoutRuns.map(normalizePayoutRun),
-        users,
-        authUserId: metaMap.auth_user_id || null,
-        currentUserId: metaMap.current_user || metaMap.auth_user_id || null,
-        theme: metaMap.theme || 'light',
-        displayCurrency: metaMap.display_currency || CONFIG.defaultCurrency || 'USD',
-        meta: metaMap,
-      };
+      return;
     }
+
+    const [clients, projects, invoices, payoutRuns, users, meta] = await Promise.all([
+      DB.query(`SELECT * FROM clients ORDER BY created_at, name`),
+      DB.query(`SELECT * FROM projects ORDER BY created_at, name`),
+      DB.query(`SELECT * FROM invoices ORDER BY issued_at DESC`),
+      DB.query(`SELECT * FROM payout_runs ORDER BY created_at DESC`),
+      DB.query(`SELECT * FROM users ORDER BY joined_at`),
+      DB.query(`SELECT key, value FROM meta`),
+    ]);
+    const metaMap = Object.fromEntries(meta.map(r => [r.key, r.value]));
+    this.state = {
+      clients,
+      projects: projects.map(normalizeProject),
+      invoices: invoices.map(normalizeInvoice),
+      payoutRuns: payoutRuns.map(normalizePayoutRun),
+      users,
+      authUserId: metaMap.auth_user_id || null,
+      currentUserId: metaMap.current_user || metaMap.auth_user_id || null,
+      theme: metaMap.theme || 'light',
+      displayCurrency: metaMap.display_currency || CONFIG.defaultCurrency || 'USD',
+      meta: metaMap,
+    };
     this.emit();
   },
 
@@ -4168,16 +4331,10 @@ async function boot() {
       const jwt = localStorage.getItem('deliverport_jwt');
       if (jwt) {
         ApiClient.token = jwt;
-        try {
-          const me = await ApiClient.me();
-          localStorage.setItem('deliverport_auth_user_id', me.id);
-        } catch {
-          // JWT expired or invalid
-          localStorage.removeItem('deliverport_jwt');
-          localStorage.removeItem('deliverport_auth_user_id');
-        }
+      } else {
+        localStorage.removeItem('deliverport_auth_user_id');
       }
-      await Store.rehydrate();
+      await Store.rehydrate({ preferBootstrapCache: true });
 
       // Infer display currency if not set
       const savedCurrency = localStorage.getItem('deliverport_display_currency');

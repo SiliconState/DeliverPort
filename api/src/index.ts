@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { compress } from 'hono/compress';
 import { serve } from '@hono/node-server';
 import { prisma } from './db.js';
 
@@ -13,6 +14,7 @@ import payoutRunRoutes from './routes/payout-runs.js';
 import portalRoutes from './routes/portal.js';
 import userRoutes from './routes/users.js';
 import metaRoutes from './routes/meta.js';
+import bootstrapRoutes from './routes/bootstrap.js';
 
 const app = new Hono();
 
@@ -40,13 +42,18 @@ app.use(
   })
 );
 
+// Compress JSON responses to reduce payload size over slow links
+app.use('*', compress());
+
 // ---------------------
 // Health check
 // ---------------------
 app.get('/api/health', (c) => {
+  c.header('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+  c.header('Vary', 'Accept-Encoding');
   return c.json({
     status: 'ok',
-    version: '1.0.0',
+    version: '1.1.0',
     timestamp: new Date().toISOString(),
   });
 });
@@ -55,6 +62,7 @@ app.get('/api/health', (c) => {
 // Routes
 // ---------------------
 app.route('/api/auth', authRoutes);
+app.route('/api/bootstrap', bootstrapRoutes);
 app.route('/api/clients', clientRoutes);
 app.route('/api/projects', projectRoutes);
 app.route('/api/invoices', invoiceRoutes);
